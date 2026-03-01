@@ -397,13 +397,13 @@
 ## 🧹 POLISH & LAUNCH PREP
 
 ### Error Handling & UX
-- [ ] Add Zod validation to all forms
-- [ ] Display inline field errors on all forms
+- [x] Add Zod validation to all forms
+- [x] Display inline field errors on all forms
 - [ ] Add loading spinners to all async actions
-- [ ] Add empty states to all list pages
-- [ ] Add success toasts to all key actions
-- [ ] Add error toasts to all failed actions
-- [ ] Add confirmation modals to all destructive actions
+- [x] Add empty states to all list pages
+- [x] Add success toasts to all key actions
+- [x] Add error toasts to all failed actions
+- [x] Add confirmation modals to all destructive actions
 
 ### Pre-Launch Testing
 - [ ] End-to-end test: Club event full chain (submit → approve → approve → approved)
@@ -413,17 +413,17 @@
 - [ ] End-to-end test: MS Department event full chain
 - [ ] End-to-end test: rejection + resubmission flow
 - [ ] End-to-end test: marketing request notification
-- [ ] RLS audit — test with 3 separate role accounts
+- [x] RLS audit — test with 3 separate role accounts
 - [ ] Confirm no console errors in production build
 - [x] Run `next build` — confirm zero build errors
 - [ ] Lighthouse audit — target score > 80
 
 ### Production Seed
-- [ ] Seed all facilities in production DB
-- [ ] Seed all entities in production DB
+- [x] Seed all facilities in production DB
+- [x] Seed all entities in production DB
 - [ ] Create all staff user accounts
 - [ ] Assign correct roles and entities to all users
-- [ ] Confirm all approver chains resolve to real user IDs
+- [x] Confirm all approver chains resolve to real user IDs (with temporary adviser placeholders for Chess Club and TED Talk Club)
 
 ### Launch
 - [ ] Run one real test event end-to-end with real accounts

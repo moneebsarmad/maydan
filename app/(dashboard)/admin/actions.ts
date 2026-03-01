@@ -4,8 +4,12 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
+  createEntityFormSchema,
+  createFacilityFormSchema,
   getZodErrorMessage,
   inviteUserFormSchema,
+  updateEntityFormSchema,
+  updateFacilityFormSchema,
   updateUserFormSchema,
 } from "@/lib/utils/admin-forms";
 
@@ -131,21 +135,23 @@ export async function deactivateUserAction(formData: FormData) {
 }
 
 export async function createEntityAction(formData: FormData) {
-  const supabase = createClient();
   await requireAdmin();
+  const parsedInput = createEntityFormSchema.safeParse({
+    name: formData.get("name"),
+    type: formData.get("type"),
+    gradeLevel: formData.get("gradeLevel"),
+  });
 
-  const name = String(formData.get("name") ?? "").trim();
-  const type = String(formData.get("type") ?? "").trim();
-  const gradeLevel = normalizeNullableString(formData.get("gradeLevel"));
-
-  if (!name || !type) {
-    throw new Error("Entity name and type are required.");
+  if (!parsedInput.success) {
+    throw new Error(getZodErrorMessage(parsedInput.error));
   }
 
+  const supabase = createClient();
+  const { name, type, gradeLevel } = parsedInput.data;
   const { error } = await supabase.from("entities").insert({
     name,
     type,
-    grade_level: gradeLevel,
+    grade_level: gradeLevel || null,
   });
 
   if (error) {
@@ -156,26 +162,28 @@ export async function createEntityAction(formData: FormData) {
 }
 
 export async function updateEntityAction(formData: FormData) {
-  const supabase = createClient();
   await requireAdmin();
+  const parsedInput = updateEntityFormSchema.safeParse({
+    entityId: formData.get("entityId"),
+    name: formData.get("name"),
+    type: formData.get("type"),
+    gradeLevel: formData.get("gradeLevel"),
+    headUserId: formData.get("headUserId"),
+  });
 
-  const entityId = String(formData.get("entityId") ?? "").trim();
-  const name = String(formData.get("name") ?? "").trim();
-  const type = String(formData.get("type") ?? "").trim();
-  const gradeLevel = normalizeNullableString(formData.get("gradeLevel"));
-  const headUserId = normalizeNullableString(formData.get("headUserId"));
-
-  if (!entityId || !name || !type) {
-    throw new Error("Entity id, name, and type are required.");
+  if (!parsedInput.success) {
+    throw new Error(getZodErrorMessage(parsedInput.error));
   }
 
+  const supabase = createClient();
+  const { entityId, name, type, gradeLevel, headUserId } = parsedInput.data;
   const { error } = await supabase
     .from("entities")
     .update({
       name,
       type,
-      grade_level: gradeLevel,
-      head_user_id: headUserId,
+      grade_level: gradeLevel || null,
+      head_user_id: headUserId ?? null,
     })
     .eq("id", entityId);
 
@@ -187,21 +195,23 @@ export async function updateEntityAction(formData: FormData) {
 }
 
 export async function createFacilityAction(formData: FormData) {
-  const supabase = createClient();
   await requireAdmin();
+  const parsedInput = createFacilityFormSchema.safeParse({
+    name: formData.get("name"),
+    capacity: formData.get("capacity"),
+    notes: formData.get("notes"),
+  });
 
-  const name = String(formData.get("name") ?? "").trim();
-  const capacity = normalizeNullableNumber(formData.get("capacity"));
-  const notes = normalizeNullableString(formData.get("notes"));
-
-  if (!name) {
-    throw new Error("Facility name is required.");
+  if (!parsedInput.success) {
+    throw new Error(getZodErrorMessage(parsedInput.error));
   }
 
+  const supabase = createClient();
+  const { name, capacity, notes } = parsedInput.data;
   const { error } = await supabase.from("facilities").insert({
     name,
-    capacity,
-    notes,
+    capacity: capacity ?? null,
+    notes: notes ?? null,
     active: true,
   });
 
@@ -213,24 +223,26 @@ export async function createFacilityAction(formData: FormData) {
 }
 
 export async function updateFacilityAction(formData: FormData) {
-  const supabase = createClient();
   await requireAdmin();
+  const parsedInput = updateFacilityFormSchema.safeParse({
+    facilityId: formData.get("facilityId"),
+    name: formData.get("name"),
+    capacity: formData.get("capacity"),
+    notes: formData.get("notes"),
+  });
 
-  const facilityId = String(formData.get("facilityId") ?? "").trim();
-  const name = String(formData.get("name") ?? "").trim();
-  const capacity = normalizeNullableNumber(formData.get("capacity"));
-  const notes = normalizeNullableString(formData.get("notes"));
-
-  if (!facilityId || !name) {
-    throw new Error("Facility id and name are required.");
+  if (!parsedInput.success) {
+    throw new Error(getZodErrorMessage(parsedInput.error));
   }
 
+  const supabase = createClient();
+  const { facilityId, name, capacity, notes } = parsedInput.data;
   const { error } = await supabase
     .from("facilities")
     .update({
       name,
-      capacity,
-      notes,
+      capacity: capacity ?? null,
+      notes: notes ?? null,
     })
     .eq("id", facilityId);
 

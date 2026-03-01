@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
+import { LoadingLabel } from "@/components/shared/loading-label";
 import { createClient } from "@/lib/supabase/client";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -29,7 +30,7 @@ export function LogoutButton() {
       type="button"
     >
       <LogOut className="h-4 w-4" />
-      {isPending ? "Logging out..." : "Logout"}
+      {isPending ? <LoadingLabel label="Logging out..." /> : "Logout"}
     </button>
   );
 }

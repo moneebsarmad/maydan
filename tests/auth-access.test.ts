@@ -2,11 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { getRouteRedirect } from "../lib/supabase/route-access";
 
-test("submitter cannot access admin routes", () => {
+test("staff cannot access admin routes", () => {
   const redirect = getRouteRedirect({
     pathname: "/admin/users",
     isAuthenticated: true,
-    userRole: "submitter",
+    userRole: "staff",
     userActive: true,
   });
 
@@ -15,11 +15,11 @@ test("submitter cannot access admin routes", () => {
   });
 });
 
-test("submitter cannot access approvals routes", () => {
+test("staff cannot access approvals routes", () => {
   const redirect = getRouteRedirect({
     pathname: "/approvals",
     isAuthenticated: true,
-    userRole: "submitter",
+    userRole: "staff",
     userActive: true,
   });
 

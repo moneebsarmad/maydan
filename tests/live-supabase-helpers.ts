@@ -203,7 +203,7 @@ async function ensureSecondarySubmitter(admin: SupabaseClient) {
       id: authUser.id,
       name: "Math Submitter",
       email: SECONDARY_SUBMITTER_EMAIL,
-      role: "submitter",
+      role: "staff",
       title: null,
       entity_id: mathEntity.id,
       active: true,

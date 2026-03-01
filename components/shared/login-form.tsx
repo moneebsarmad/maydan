@@ -2,38 +2,46 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { FormError } from "@/components/shared/form-error";
+import { LoadingLabel } from "@/components/shared/loading-label";
+import { AppToast } from "@/components/shared/toast";
 import { createClient } from "@/lib/supabase/client";
+import {
+  loginFormSchema,
+  type LoginFormValues,
+} from "@/lib/utils/auth-forms";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export function LoginForm() {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginFormSchema),
+  });
 
   return (
     <form
       className="space-y-5"
-      onSubmit={(event) => {
-        event.preventDefault();
-        setError(null);
-
-        const formData = new FormData(event.currentTarget);
-        const email = String(formData.get("email") ?? "").trim();
-        const password = String(formData.get("password") ?? "");
+      onSubmit={handleSubmit((values) => {
+        setToast(null);
 
         startTransition(async () => {
           try {
             const supabase = createClient();
             const { data, error: signInError } =
-              await supabase.auth.signInWithPassword({
-                email,
-                password,
-              });
+              await supabase.auth.signInWithPassword(values);
 
             if (signInError) {
-              setError(signInError.message);
+              setToast(signInError.message);
               return;
             }
 
@@ -45,7 +53,7 @@ export function LoginForm() {
 
             if (profileError || !profile?.active) {
               await supabase.auth.signOut();
-              setError(
+              setToast(
                 profileError?.message ||
                   "This account is not active in Maydan. Contact an administrator.",
               );
@@ -55,40 +63,46 @@ export function LoginForm() {
             router.replace("/dashboard");
             router.refresh();
           } catch (error) {
-            setError(
+            setToast(
               error instanceof Error
                 ? error.message
                 : "Unable to sign in right now.",
             );
           }
         });
-      }}
+      })}
     >
+      {toast ? (
+        <AppToast
+          title="Sign in failed"
+          description={toast}
+          variant="error"
+        />
+      ) : null}
       <div className="space-y-2">
         <Label htmlFor="email">School email</Label>
         <Input
           id="email"
-          name="email"
           type="email"
           autoComplete="email"
           placeholder="name@bhaprep.org"
-          required
+          {...register("email")}
         />
+        <FormError message={errors.email?.message} />
       </div>
       <div className="space-y-2">
         <Label htmlFor="password">Password</Label>
         <Input
           id="password"
-          name="password"
           type="password"
           autoComplete="current-password"
           placeholder="Enter your password"
-          required
+          {...register("password")}
         />
+        <FormError message={errors.password?.message} />
       </div>
-      {error ? <p className="text-sm font-medium text-rose-700">{error}</p> : null}
       <Button className="w-full justify-center" disabled={isPending} type="submit">
-        {isPending ? "Signing in..." : "Sign in"}
+        {isPending ? <LoadingLabel label="Signing in..." /> : "Sign in"}
       </Button>
     </form>
   );

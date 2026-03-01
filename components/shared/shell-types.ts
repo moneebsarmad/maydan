@@ -1,4 +1,4 @@
-export type ShellRole = "submitter" | "approver" | "viewer" | "admin";
+export type ShellRole = "staff" | "approver" | "viewer" | "admin";
 
 export interface ShellUser {
   id: string;

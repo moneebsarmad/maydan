@@ -147,7 +147,7 @@ test("live workflow verification: inactive Maydan users are blocked from protect
   const redirect = getRouteRedirect({
     pathname: "/dashboard",
     isAuthenticated: true,
-    userRole: "submitter",
+    userRole: "staff",
     userActive: false,
   });
 

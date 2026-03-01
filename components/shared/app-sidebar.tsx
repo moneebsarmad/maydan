@@ -30,13 +30,13 @@ const navItems: NavItem[] = [
     label: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
-    roles: ["submitter", "approver", "viewer", "admin"],
+    roles: ["staff", "approver", "viewer", "admin"],
   },
   {
     label: "Events",
     href: "/events",
     icon: TicketPlus,
-    roles: ["submitter", "approver", "viewer", "admin"],
+    roles: ["staff", "approver", "viewer", "admin"],
   },
   {
     label: "Approvals",
@@ -48,7 +48,7 @@ const navItems: NavItem[] = [
     label: "Calendar",
     href: "/calendar",
     icon: CalendarDays,
-    roles: ["submitter", "approver", "viewer", "admin"],
+    roles: ["staff", "approver", "viewer", "admin"],
   },
   {
     label: "Admin",
@@ -130,8 +130,8 @@ export function AppSidebar({ role, mobile = false }: AppSidebarProps) {
           Role-aware nav
         </p>
         <p className="mt-3 text-sm text-slate-200">
-          Approvals are hidden for pure submitters. Admin is hidden for
-          non-admin roles.
+          Approval tools are hidden unless the role includes approver access.
+          Admin is hidden for non-admin roles.
         </p>
       </div>
     </aside>

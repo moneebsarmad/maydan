@@ -8,6 +8,7 @@ import {
   suggestAlternative,
 } from "@/app/(dashboard)/approvals/actions";
 import { ConfirmModal } from "@/components/shared/confirm-modal";
+import { LoadingLabel } from "@/components/shared/loading-label";
 import { AppToast } from "@/components/shared/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -151,7 +152,7 @@ export function ApprovalActionShell({
         disabled={confirmDisabled}
         onClick={() => setConfirmOpen(true)}
       >
-        {isPending ? "Saving..." : "Confirm action"}
+        {isPending ? <LoadingLabel label="Saving..." /> : "Confirm action"}
       </Button>
 
       <ConfirmModal

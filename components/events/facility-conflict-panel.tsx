@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { flagFacilityConflict } from "@/app/(dashboard)/approvals/actions";
+import { LoadingLabel } from "@/components/shared/loading-label";
 import { AppToast } from "@/components/shared/toast";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -85,7 +86,7 @@ export function FacilityConflictPanel({
         }}
       >
         {isPending
-          ? "Saving..."
+          ? <LoadingLabel label="Saving..." />
           : existingNotes
             ? "Update conflict note"
             : "Flag conflict"}

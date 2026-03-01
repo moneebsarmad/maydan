@@ -14,7 +14,7 @@ export default async function NewEventPage() {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("entity_id")
+    .select("entity_id, role")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -31,6 +31,26 @@ export default async function NewEventPage() {
         .eq("id", profile.entity_id)
         .maybeSingle()
     : { data: null };
+
+  if (profile?.role === "viewer") {
+    return (
+      <div className="space-y-6">
+        <section>
+          <p className="text-xs uppercase tracking-[0.28em] text-stone-500">
+            New event
+          </p>
+          <h1 className="mt-2 text-4xl font-semibold tracking-tight text-slate-950">
+            Event submission form
+          </h1>
+        </section>
+
+        <EmptyState
+          title="Read-only access"
+          description="This Maydan account can view events but cannot submit them."
+        />
+      </div>
+    );
+  }
 
   if (!profile?.entity_id || !entity) {
     return (

@@ -233,7 +233,7 @@ export const adminUsers = [
   {
     name: "Amina Yusuf",
     email: "amina@bhaprep.org",
-    role: "submitter",
+    role: "staff",
     entity: "Qur'an Department",
     status: "Active",
   },

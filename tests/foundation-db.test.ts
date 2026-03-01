@@ -49,7 +49,7 @@ test("Supabase live connection supports auth and protected reads", { skip: !hasE
   }
 });
 
-test("RLS prevents cross-submitter data leakage and blocks unauthorized approval actions", { skip: !hasEnv }, async () => {
+test("RLS audit covers submitter, approver, and facilities permissions", { skip: !hasEnv }, async () => {
   const fixtures = await buildLiveFixtures();
   const createdEventIds: string[] = [];
 
@@ -101,6 +101,16 @@ test("RLS prevents cross-submitter data leakage and blocks unauthorized approval
 
     assert.equal(ownVisibleEventsError, null);
     assert.equal(ownVisibleEvents?.length, 0);
+
+    const { data: approverQueue, error: approverQueueError } =
+      await fixtures.approver.client
+        .from("approval_steps")
+        .select("id, approver_id")
+        .eq("id", primaryStep.id);
+
+    assert.equal(approverQueueError, null);
+    assert.equal(approverQueue?.length, 1);
+    assert.equal(approverQueue?.[0]?.approver_id, fixtures.approver.user.id);
 
     const { data: unauthorizedApprovalResult, error: unauthorizedApprovalError } =
       await fixtures.secondarySubmitter.client

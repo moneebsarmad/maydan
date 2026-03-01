@@ -46,10 +46,10 @@ export function RealtimeListeners({
         .subscribe(),
     ];
 
-    if (role === "submitter") {
+    if (role === "staff") {
       channels.push(
         supabase
-          .channel(`submitter-events:${userId}`)
+          .channel(`staff-events:${userId}`)
           .on(
             "postgres_changes",
             {

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { resubmitEvent } from "@/app/(dashboard)/approvals/actions";
+import { LoadingLabel } from "@/components/shared/loading-label";
 import { AppToast } from "@/components/shared/toast";
 import { Button } from "@/components/ui/button";
 
@@ -53,7 +54,7 @@ export function ResubmitButton({ eventId }: ResubmitButtonProps) {
           });
         }}
       >
-        {isPending ? "Resubmitting..." : "Resubmit event"}
+        {isPending ? <LoadingLabel label="Resubmitting..." /> : "Resubmit event"}
       </Button>
     </div>
   );

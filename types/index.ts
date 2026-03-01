@@ -1,4 +1,4 @@
-export type UserRole = "submitter" | "approver" | "viewer" | "admin";
+export type UserRole = "staff" | "approver" | "viewer" | "admin";
 export type EntityType = "club" | "house" | "department" | "athletics";
 export type GradeLevel = "MS" | "HS" | "Both";
 export type EventStatus =

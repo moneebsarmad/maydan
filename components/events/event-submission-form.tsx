@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { saveDraft, submitEvent } from "@/app/(dashboard)/events/actions";
+import { LoadingLabel } from "@/components/shared/loading-label";
 import { AppToast } from "@/components/shared/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -376,10 +377,18 @@ export function EventSubmissionForm({
             disabled={isPending}
             onClick={handleSubmit((values) => runAction("draft", values))}
           >
-            {pendingAction === "draft" ? "Saving draft..." : "Save draft"}
+            {pendingAction === "draft" ? (
+              <LoadingLabel label="Saving draft..." />
+            ) : (
+              "Save draft"
+            )}
           </Button>
           <Button type="submit" disabled={isPending}>
-            {pendingAction === "submit" ? "Submitting..." : "Submit event"}
+            {pendingAction === "submit" ? (
+              <LoadingLabel label="Submitting..." />
+            ) : (
+              "Submit event"
+            )}
           </Button>
         </div>
       </form>

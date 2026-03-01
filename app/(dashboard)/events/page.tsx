@@ -33,6 +33,8 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
   const selectedStatus = normalizeStatus(searchParams?.status);
   const selectedEntityId = normalizeSearchValue(searchParams?.entity);
   const selectedDate = normalizeSearchValue(searchParams?.date);
+  const isStaffQueue = user.role === "staff";
+  const canSubmitEvents = user.role !== "viewer";
   let query = supabase
     .from("events")
     .select(
@@ -53,7 +55,7 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
     )
     .order("created_at", { ascending: false });
 
-  if (user.role === "submitter") {
+  if (isStaffQueue) {
     query = query.eq("submitter_id", user.id);
   }
 
@@ -104,16 +106,18 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
             Events
           </p>
           <h1 className="mt-2 text-4xl font-semibold tracking-tight text-slate-950">
-            {user.role === "submitter" ? "Submission queue" : "Event overview"}
+            {isStaffQueue ? "Submission queue" : "Event overview"}
           </h1>
           <p className="mt-3 max-w-2xl text-base leading-7 text-stone-600">
-            {user.role === "submitter"
+            {isStaffQueue
               ? "Review your saved drafts, pending approvals, and approved events in one place."
-              : "Review the events currently visible to your role under Maydan access rules."}
+              : canSubmitEvents
+                ? "Review the events visible to your role and submit new requests when needed."
+                : "Review the approved events currently visible under your read-only access."}
           </p>
         </div>
 
-        {user.role === "submitter" ? (
+        {canSubmitEvents ? (
           <Link
             href="/events/new"
             className="inline-flex items-center justify-center rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
@@ -144,14 +148,16 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
       ) : (
         <EmptyState
           title={
-            user.role === "submitter"
+            isStaffQueue
               ? "No events submitted yet"
               : "No visible events right now"
           }
           description={
-            user.role === "submitter"
+            isStaffQueue
               ? "Your Maydan submissions will appear here after you save a draft or submit an event."
-              : "No events are currently available to your role under the active RLS policies."
+              : canSubmitEvents
+                ? "No events are currently available to your role under the active RLS policies."
+                : "No approved events are currently available under the active access rules."
           }
         />
       )}

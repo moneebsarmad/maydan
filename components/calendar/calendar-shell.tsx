@@ -12,6 +12,7 @@ import {
   startOfMonth,
   startOfWeek,
 } from "date-fns";
+import { EmptyState } from "@/components/shared/empty-state";
 import { cn } from "@/lib/utils";
 
 interface CalendarEvent {
@@ -189,9 +190,12 @@ export function CalendarShell({ events }: CalendarShellProps) {
               </div>
             </>
           ) : (
-            <p className="mt-4 text-sm text-stone-600">
-              No approved events match the current filters.
-            </p>
+            <div className="mt-4">
+              <EmptyState
+                title="No approved events match these filters"
+                description="Adjust the entity, facility, or grade-level filters to review another approved event."
+              />
+            </div>
           )}
         </aside>
       </div>

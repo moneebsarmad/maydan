@@ -300,7 +300,7 @@ async function getActiveProfileWithEntity(
 
   const { data: profile, error: profileError } = await supabase
     .from("users")
-    .select("id, active, entity_id")
+    .select("id, role, active, entity_id")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -310,6 +310,10 @@ async function getActiveProfileWithEntity(
 
   if (!profile?.active) {
     throw new Error("Your Maydan account is inactive.");
+  }
+
+  if (profile.role === "viewer") {
+    throw new Error("This Maydan account has read-only access.");
   }
 
   if (!profile.entity_id) {
