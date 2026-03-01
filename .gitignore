@@ -9,6 +9,8 @@ npm-debug.log*
 out
 coverage
 .test-dist
+test-results
+playwright-report
 .duplicate__*
 .workspace-duplicate-backup
 *.tsbuildinfo

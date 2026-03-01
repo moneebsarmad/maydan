@@ -13,7 +13,8 @@
     "test:notifications": "rm -rf .test-dist && tsc -p tsconfig.test.json && node --test .test-dist/tests/notification-payloads.test.js",
     "test:workflow-verification": "rm -rf .test-dist && tsc -p tsconfig.test.json && node --test .test-dist/tests/workflow-verification.test.js",
     "test:production-seed": "rm -rf .test-dist && tsc -p tsconfig.test.json && node --test .test-dist/tests/production-seed.test.js",
-    "test:staff-directory": "rm -rf .test-dist && tsc -p tsconfig.test.json && node --test .test-dist/tests/staff-directory.test.js"
+    "test:staff-directory": "rm -rf .test-dist && tsc -p tsconfig.test.json && node --test .test-dist/tests/staff-directory.test.js",
+    "test:prod-browser": "playwright test tests/e2e/production-smoke.spec.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -36,12 +37,14 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@types/node": "^24.3.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "autoprefixer": "^10.4.21",
     "eslint": "^8.57.1",
     "eslint-config-next": "14.2.35",
+    "playwright": "^1.58.2",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.9.2"

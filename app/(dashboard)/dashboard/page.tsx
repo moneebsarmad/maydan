@@ -86,16 +86,21 @@ export default async function DashboardPage() {
     upcomingApprovedEventsResponse,
     pendingApprovalStepsResponse,
   ] = await Promise.all([
-    buildVisibleEventsQuery(supabase, user.role, user.id)
-      .select("id", { count: "exact", head: true })
-      .eq("status", "pending"),
-    buildVisibleEventsQuery(supabase, user.role, user.id)
-      .select("id", { count: "exact", head: true })
+    buildVisibleEventsQuery(
+      supabase.from("events").select("id", { count: "exact", head: true }),
+      user.role,
+      user.id,
+    ).eq("status", "pending"),
+    buildVisibleEventsQuery(
+      supabase.from("events").select("id", { count: "exact", head: true }),
+      user.role,
+      user.id,
+    )
       .eq("status", "approved")
       .gte("date", format(monthStart, "yyyy-MM-dd"))
       .lt("date", format(nextMonthStart, "yyyy-MM-dd")),
-    buildVisibleEventsQuery(supabase, user.role, user.id)
-      .select(
+    buildVisibleEventsQuery(
+      supabase.from("events").select(
         `
           id,
           name,
@@ -109,11 +114,14 @@ export default async function DashboardPage() {
           entity:entities!events_entity_id_fkey(name),
           facility:facilities!events_facility_id_fkey(name)
         `,
-      )
+      ),
+      user.role,
+      user.id,
+    )
       .order("updated_at", { ascending: false })
       .limit(4),
-    buildVisibleEventsQuery(supabase, user.role, user.id)
-      .select(
+    buildVisibleEventsQuery(
+      supabase.from("events").select(
         `
           id,
           name,
@@ -127,7 +135,10 @@ export default async function DashboardPage() {
           entity:entities!events_entity_id_fkey(name),
           facility:facilities!events_facility_id_fkey(name)
         `,
-      )
+      ),
+      user.role,
+      user.id,
+    )
       .eq("status", "approved")
       .gte("date", today)
       .order("date", { ascending: true })
@@ -356,14 +367,12 @@ export default async function DashboardPage() {
 }
 
 function buildVisibleEventsQuery(
-  supabase: ReturnType<typeof createClient>,
+  query: any,
   role: ShellRole,
   userId: string,
 ) {
-  let query = supabase.from("events") as any;
-
   if (role === "staff") {
-    query = query.eq("submitter_id", userId);
+    return query.eq("submitter_id", userId);
   }
 
   return query;
