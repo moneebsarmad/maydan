@@ -115,6 +115,31 @@ export async function sendAlternativeSuggestedEmail(
   });
 }
 
+export async function sendFacilityConflictFlaggedEmail(
+  to: string,
+  eventName: string,
+  notes: string,
+  eventId: string,
+) {
+  return resend.emails.send({
+    from: fromEmail,
+    to,
+    subject: `Facility conflict flagged for "${eventName}"`,
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #0f172a;">
+        <h2 style="margin-bottom: 8px;">Facility conflict flagged</h2>
+        <p>Facilities flagged a conflict that needs review on this Maydan event.</p>
+        <p><strong>Event:</strong> ${escapeHtml(eventName)}</p>
+        <p><strong>Conflict note:</strong> ${escapeHtml(notes)}</p>
+        <p>
+          Review the event:
+          <a href="${appUrl}/events/${eventId}">${appUrl}/events/${eventId}</a>
+        </p>
+      </div>
+    `,
+  });
+}
+
 export async function sendMarketingRequestEmail(
   to: string,
   eventName: string,

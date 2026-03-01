@@ -84,6 +84,15 @@ export interface MarketingRequest {
   created_at: string | null;
 }
 
+export interface FacilityConflict {
+  id: string;
+  event_id: string | null;
+  notes: string;
+  flagged_by: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
 export interface Notification {
   id: string;
   user_id: string | null;

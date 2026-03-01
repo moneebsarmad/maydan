@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { ApprovalChainProgress } from "@/components/approvals/approval-chain-progress";
+import { FacilityConflictCard } from "@/components/events/facility-conflict-card";
+import { FacilityConflictPanel } from "@/components/events/facility-conflict-panel";
 import { ResubmitButton } from "@/components/events/resubmit-button";
 import { StatusBadge } from "@/components/events/status-badge";
 import { AppToast } from "@/components/shared/toast";
@@ -77,6 +79,11 @@ export default async function EventDetailPage({
     .select("type, details, target_audience, priority, file_url")
     .eq("event_id", params.id)
     .maybeSingle();
+  const { data: facilityConflict } = await supabase
+    .from("facility_conflicts")
+    .select("notes, created_at")
+    .eq("event_id", params.id)
+    .maybeSingle();
 
   const entity = Array.isArray(event.entity) ? event.entity[0] : event.entity;
   const facility = Array.isArray(event.facility) ? event.facility[0] : event.facility;
@@ -96,6 +103,9 @@ export default async function EventDetailPage({
   );
   const canResubmit =
     event.status === "needs_revision" && event.submitter_id === user.id;
+  const canFlagFacilityConflict =
+    event.status === "pending" &&
+    (user.role === "admin" || user.title === "Facilities Director");
 
   return (
     <div className="space-y-6">
@@ -163,6 +173,13 @@ export default async function EventDetailPage({
             </dl>
           </div>
 
+          {facilityConflict ? (
+            <FacilityConflictCard
+              notes={facilityConflict.notes}
+              createdAt={facilityConflict.created_at}
+            />
+          ) : null}
+
           {rejectionReason ? (
             <div className="rounded-[1.75rem] border border-rose-200 bg-rose-50 p-6 shadow-sm">
               <p className="text-xs uppercase tracking-[0.24em] text-rose-700">
@@ -216,7 +233,15 @@ export default async function EventDetailPage({
           ) : null}
         </section>
 
-        <ApprovalChainProgress steps={steps} />
+        <div className="space-y-6">
+          <ApprovalChainProgress steps={steps} />
+          {canFlagFacilityConflict ? (
+            <FacilityConflictPanel
+              eventId={event.id}
+              existingNotes={facilityConflict?.notes}
+            />
+          ) : null}
+        </div>
       </div>
     </div>
   );

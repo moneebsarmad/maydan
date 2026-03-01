@@ -8,6 +8,7 @@ import {
   sendAlternativeSuggestedEmail,
   sendEventApprovedEmail,
   sendEventRejectedEmail,
+  sendFacilityConflictFlaggedEmail,
   sendFacilitiesNotificationEmail,
 } from "@/lib/resend/emails";
 import { createClient } from "@/lib/supabase/server";
@@ -23,6 +24,10 @@ const rejectionSchema = eventActionSchema.extend({
 const alternativeSchema = eventActionSchema.extend({
   suggestedDate: z.string().trim().min(1, "A suggested date is required."),
   suggestedTime: z.string().trim().min(1, "A suggested time is required."),
+});
+
+const facilityConflictSchema = eventActionSchema.extend({
+  notes: z.string().trim().min(1, "A facility conflict note is required."),
 });
 
 interface ApprovalActionSuccess {
@@ -475,6 +480,124 @@ export async function resubmitEvent(input: {
   }
 }
 
+export async function flagFacilityConflict(input: {
+  eventId: string;
+  notes: string;
+}): Promise<ApprovalActionResult> {
+  const parsedInput = facilityConflictSchema.safeParse(input);
+
+  if (!parsedInput.success) {
+    return {
+      success: false,
+      error:
+        parsedInput.error.issues[0]?.message ?? "Invalid facility conflict action.",
+    };
+  }
+
+  const supabase = createClient();
+
+  try {
+    const actor = await getActiveActor(supabase);
+
+    if (actor.role !== "admin" && actor.title !== "Facilities Director") {
+      throw new Error("Only Facilities can flag facility conflicts.");
+    }
+
+    const event = await getWorkflowEvent(supabase, parsedInput.data.eventId);
+
+    if (event.status !== "pending") {
+      throw new Error("Facility conflicts can only be flagged while an event is pending.");
+    }
+
+    const currentStep = await getCurrentPendingStep(
+      supabase,
+      parsedInput.data.eventId,
+      event.currentStep,
+    );
+    const existingConflict = await getFacilityConflict(
+      supabase,
+      parsedInput.data.eventId,
+    );
+    const timestamp = new Date().toISOString();
+
+    if (existingConflict) {
+      const { error: updateError } = await supabase
+        .from("facility_conflicts")
+        .update({
+          notes: parsedInput.data.notes,
+          flagged_by: actor.id,
+          updated_at: timestamp,
+        })
+        .eq("event_id", parsedInput.data.eventId);
+
+      if (updateError) {
+        throw new Error(updateError.message);
+      }
+    } else {
+      const { error: insertError } = await supabase
+        .from("facility_conflicts")
+        .insert({
+          event_id: parsedInput.data.eventId,
+          notes: parsedInput.data.notes,
+          flagged_by: actor.id,
+          updated_at: timestamp,
+        });
+
+      if (insertError) {
+        throw new Error(insertError.message);
+      }
+    }
+
+    const recipientIds = [event.submitterId, currentStep.approverId].filter(
+      (userId, index, recipients) => recipients.indexOf(userId) === index,
+    );
+
+    await Promise.all(
+      recipientIds.map((userId) =>
+        createNotification(
+          userId,
+          parsedInput.data.eventId,
+          `Facilities flagged a conflict on "${event.name}": ${parsedInput.data.notes}`,
+        ),
+      ),
+    );
+
+    const recipients = await Promise.all(
+      recipientIds.map((userId) => getUserContact(supabase, userId)),
+    );
+
+    await Promise.allSettled(
+      recipients.flatMap((recipient) =>
+        recipient?.email
+          ? [
+              sendFacilityConflictFlaggedEmail(
+                recipient.email,
+                event.name,
+                parsedInput.data.notes,
+                parsedInput.data.eventId,
+              ),
+            ]
+          : [],
+      ),
+    );
+
+    revalidateWorkflowPaths(parsedInput.data.eventId);
+
+    return {
+      success: true,
+      message: "Facility conflict saved and the submitter plus current approver were notified.",
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Unable to flag this facility conflict right now.",
+    };
+  }
+}
+
 async function getActiveActor(supabase: ReturnType<typeof createClient>) {
   const {
     data: { user },
@@ -486,7 +609,7 @@ async function getActiveActor(supabase: ReturnType<typeof createClient>) {
 
   const { data: profile, error } = await supabase
     .from("users")
-    .select("id, active")
+    .select("id, active, role, title")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -500,6 +623,8 @@ async function getActiveActor(supabase: ReturnType<typeof createClient>) {
 
   return {
     id: profile.id,
+    role: profile.role,
+    title: profile.title,
   };
 }
 
@@ -638,6 +763,23 @@ async function getFacilitiesRecipient(supabase: ReturnType<typeof createClient>)
     id: data.id,
     email: data.email,
   };
+}
+
+async function getFacilityConflict(
+  supabase: ReturnType<typeof createClient>,
+  eventId: string,
+) {
+  const { data, error } = await supabase
+    .from("facility_conflicts")
+    .select("id")
+    .eq("event_id", eventId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
 }
 
 function revalidateWorkflowPaths(eventId: string) {

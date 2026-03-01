@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { ApprovalActionShell } from "@/components/approvals/approval-action-shell";
 import { ApprovalChainProgress } from "@/components/approvals/approval-chain-progress";
+import { FacilityConflictCard } from "@/components/events/facility-conflict-card";
 import { StatusBadge } from "@/components/events/status-badge";
 import { getShellUser } from "@/lib/supabase/get-shell-user";
 import { createClient } from "@/lib/supabase/server";
@@ -63,6 +64,11 @@ export default async function ApprovalDetailPage({
     )
     .eq("event_id", params.id)
     .order("step_number", { ascending: true });
+  const { data: facilityConflict } = await supabase
+    .from("facility_conflicts")
+    .select("notes, created_at")
+    .eq("event_id", params.id)
+    .maybeSingle();
 
   if (user.role !== "admin" && (approvalSteps?.length ?? 0) === 0) {
     notFound();
@@ -150,6 +156,13 @@ export default async function ApprovalDetailPage({
               />
             </dl>
           </div>
+
+          {facilityConflict ? (
+            <FacilityConflictCard
+              notes={facilityConflict.notes}
+              createdAt={facilityConflict.created_at}
+            />
+          ) : null}
 
           <ApprovalChainProgress steps={normalizedSteps} />
 

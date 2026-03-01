@@ -283,16 +283,21 @@
   - [x] Reset `events.current_step` to 1
   - [x] Set event status to `pending`
   - [x] Notify Step 1 approver
+- [x] Build facility conflict flag action
+  - [x] Save facility conflict note
+  - [x] Notify submitter + current approver
 - [x] Wire Approve button to `approveStep`
 - [x] Wire Reject button to `rejectStep`
 - [x] Wire Suggest Alternative to `suggestAlternative`
 - [x] Wire Resubmit button to `resubmitEvent`
+- [x] Wire Facilities conflict action to event detail page
 - [x] Test: approve Step 1 → Step 2 approver notified
 - [x] Test: approve final step → event approved, submitter notified
 - [x] Test: reject at Step 1 → event paused, submitter notified
 - [x] Test: reject at Step 2 → event paused, submitter notified
 - [x] Test: resubmit → chain restarts from Step 1
 - [x] Test: Facilities Director receives notification on all submissions
+- [x] Test: Facilities Director can flag a conflict
 
 ---
 

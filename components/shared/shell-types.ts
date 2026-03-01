@@ -5,5 +5,6 @@ export interface ShellUser {
   name: string;
   email: string;
   role: ShellRole;
+  title: string | null;
   active: boolean;
 }

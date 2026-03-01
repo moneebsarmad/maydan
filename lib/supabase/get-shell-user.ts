@@ -19,7 +19,7 @@ export async function getShellUser(): Promise<ShellUser | null> {
 
   const { data: profile } = await supabase
     .from("users")
-    .select("id, name, email, role, active")
+    .select("id, name, email, role, title, active")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -32,6 +32,7 @@ export async function getShellUser(): Promise<ShellUser | null> {
     name: profile.name,
     email: profile.email,
     role: profile.role,
+    title: profile.title,
     active: profile.active ?? true,
   };
 }
