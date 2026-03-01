@@ -8,6 +8,7 @@ import {
   markAllAsRead,
   markAsRead,
 } from "@/app/(dashboard)/notifications/actions";
+import { LoadingLabel } from "@/components/shared/loading-label";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -66,7 +67,7 @@ export function NotificationDropdown({
           disabled={isPending || unreadCount === 0}
           onClick={handleMarkAllAsRead}
         >
-          Mark all read
+          {isPending ? <LoadingLabel label="Saving..." /> : "Mark all read"}
         </Button>
       </div>
 
@@ -100,6 +101,11 @@ export function NotificationDropdown({
                       })
                     : "recently"}
                 </p>
+                {isPending ? (
+                  <p className="mt-2 text-xs uppercase tracking-[0.14em] text-stone-500">
+                    Updating...
+                  </p>
+                ) : null}
               </div>
             </button>
           ))}

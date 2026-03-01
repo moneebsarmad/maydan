@@ -11,6 +11,9 @@ const requiredEnvKeys = [
 
 export const TEST_PASSWORD = "Maydan!Test1234";
 export const SECONDARY_SUBMITTER_EMAIL = "maydan.math.submitter@bhaprep.org";
+export const PRIMARY_SUBMITTER_EMAIL = "maydan.hosa.submitter@bhaprep.org";
+export const PRIMARY_APPROVER_EMAIL = "maydan.hosa.adviser@bhaprep.org";
+export const FACILITIES_EMAIL = "facilities@bhaprep.org";
 
 type RequiredEnvKey = (typeof requiredEnvKeys)[number];
 
@@ -90,14 +93,19 @@ export async function signIn(email: string) {
 export async function buildLiveFixtures(): Promise<LiveFixtureSet> {
   const admin = getAdminClient();
 
-  await ensureSecondarySubmitter(admin);
+  await Promise.all([
+    ensurePrimarySubmitter(admin),
+    ensurePrimaryApprover(admin),
+    ensureSecondarySubmitter(admin),
+    ensureFacilitiesViewer(admin),
+  ]);
 
   const [submitter, secondarySubmitter, approver, facilities] =
     await Promise.all([
-      signIn("maydan.hosa.submitter@bhaprep.org"),
+      signIn(PRIMARY_SUBMITTER_EMAIL),
       signIn(SECONDARY_SUBMITTER_EMAIL),
-      signIn("maydan.hosa.adviser@bhaprep.org"),
-      signIn("maydan.facilities@bhaprep.org"),
+      signIn(PRIMARY_APPROVER_EMAIL),
+      signIn(FACILITIES_EMAIL),
     ]);
 
   return {
@@ -190,6 +198,67 @@ export async function cleanupEvents(admin: SupabaseClient, eventIds: string[]) {
   await admin.from("events").delete().in("id", eventIds);
 }
 
+async function ensurePrimarySubmitter(admin: SupabaseClient) {
+  const authUser = await findOrCreateAuthUser(
+    admin,
+    PRIMARY_SUBMITTER_EMAIL,
+    "HOSA Submitter",
+  );
+  const entity = await getEntityByName(admin, "HOSA");
+
+  const { error } = await admin.from("users").upsert(
+    {
+      id: authUser.id,
+      name: "HOSA Submitter",
+      email: PRIMARY_SUBMITTER_EMAIL,
+      role: "staff",
+      title: null,
+      entity_id: entity.id,
+      active: true,
+    },
+    { onConflict: "id" },
+  );
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+async function ensurePrimaryApprover(admin: SupabaseClient) {
+  const authUser = await findOrCreateAuthUser(
+    admin,
+    PRIMARY_APPROVER_EMAIL,
+    "HOSA Adviser",
+  );
+  const entity = await getEntityByName(admin, "HOSA");
+
+  const { error } = await admin.from("users").upsert(
+    {
+      id: authUser.id,
+      name: "HOSA Adviser",
+      email: PRIMARY_APPROVER_EMAIL,
+      role: "approver",
+      title: "Club Adviser",
+      entity_id: entity.id,
+      active: true,
+    },
+    { onConflict: "id" },
+  );
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const { error: entityError } = await admin
+    .from("entities")
+    .update({ head_user_id: authUser.id })
+    .eq("id", entity.id);
+
+  if (entityError) {
+    throw new Error(entityError.message);
+  }
+}
+
 async function ensureSecondarySubmitter(admin: SupabaseClient) {
   const authUser = await findOrCreateAuthUser(
     admin,
@@ -206,6 +275,31 @@ async function ensureSecondarySubmitter(admin: SupabaseClient) {
       role: "staff",
       title: null,
       entity_id: mathEntity.id,
+      active: true,
+    },
+    { onConflict: "id" },
+  );
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
+async function ensureFacilitiesViewer(admin: SupabaseClient) {
+  const authUser = await findOrCreateAuthUser(
+    admin,
+    FACILITIES_EMAIL,
+    "Arbad Ismail",
+  );
+
+  const { error } = await admin.from("users").upsert(
+    {
+      id: authUser.id,
+      name: "Arbad Ismail",
+      email: FACILITIES_EMAIL,
+      role: "viewer",
+      title: "Facilities Director",
+      entity_id: null,
       active: true,
     },
     { onConflict: "id" },

@@ -12,7 +12,8 @@
     "test:auth-access": "rm -rf .test-dist && tsc -p tsconfig.test.json && node --test .test-dist/tests/auth-access.test.js",
     "test:notifications": "rm -rf .test-dist && tsc -p tsconfig.test.json && node --test .test-dist/tests/notification-payloads.test.js",
     "test:workflow-verification": "rm -rf .test-dist && tsc -p tsconfig.test.json && node --test .test-dist/tests/workflow-verification.test.js",
-    "test:production-seed": "rm -rf .test-dist && tsc -p tsconfig.test.json && node --test .test-dist/tests/production-seed.test.js"
+    "test:production-seed": "rm -rf .test-dist && tsc -p tsconfig.test.json && node --test .test-dist/tests/production-seed.test.js",
+    "test:staff-directory": "rm -rf .test-dist && tsc -p tsconfig.test.json && node --test .test-dist/tests/staff-directory.test.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

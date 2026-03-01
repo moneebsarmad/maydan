@@ -399,20 +399,20 @@
 ### Error Handling & UX
 - [x] Add Zod validation to all forms
 - [x] Display inline field errors on all forms
-- [ ] Add loading spinners to all async actions
+- [x] Add loading spinners to all async actions
 - [x] Add empty states to all list pages
 - [x] Add success toasts to all key actions
 - [x] Add error toasts to all failed actions
 - [x] Add confirmation modals to all destructive actions
 
 ### Pre-Launch Testing
-- [ ] End-to-end test: Club event full chain (submit → approve → approve → approved)
-- [ ] End-to-end test: House event full chain (3 steps)
-- [ ] End-to-end test: Athletics event full chain (3 steps)
-- [ ] End-to-end test: HS Department event full chain
-- [ ] End-to-end test: MS Department event full chain
-- [ ] End-to-end test: rejection + resubmission flow
-- [ ] End-to-end test: marketing request notification
+- [x] End-to-end test: Club event full chain (submit → approve → approve → approved)
+- [x] End-to-end test: House event full chain (3 steps)
+- [x] End-to-end test: Athletics event full chain (3 steps)
+- [x] End-to-end test: HS Department event full chain
+- [x] End-to-end test: MS Department event full chain
+- [x] End-to-end test: rejection + resubmission flow
+- [x] End-to-end test: marketing request notification
 - [x] RLS audit — test with 3 separate role accounts
 - [ ] Confirm no console errors in production build
 - [x] Run `next build` — confirm zero build errors
@@ -421,8 +421,8 @@
 ### Production Seed
 - [x] Seed all facilities in production DB
 - [x] Seed all entities in production DB
-- [ ] Create all staff user accounts
-- [ ] Assign correct roles and entities to all users
+- [x] Create all staff user accounts (Maydan in-scope BHA directory synced from official faculty/staff page)
+- [x] Assign correct roles and entities to all users (support roles remain null-entity where no matching schema entity exists)
 - [x] Confirm all approver chains resolve to real user IDs (with temporary adviser placeholders for Chess Club and TED Talk Club)
 
 ### Launch
