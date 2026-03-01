@@ -1,6 +1,38 @@
 import { CalendarShell } from "@/components/calendar/calendar-shell";
+import { createClient } from "@/lib/supabase/server";
 
-export default function CalendarPage() {
+export default async function CalendarPage() {
+  const supabase = createClient();
+  const { data: events } = await supabase
+    .from("events")
+    .select(
+      `
+        id,
+        name,
+        date,
+        grade_level,
+        facility:facilities!events_facility_id_fkey(name),
+        entity:entities!events_entity_id_fkey(name, type)
+      `,
+    )
+    .eq("status", "approved")
+    .order("date", { ascending: true });
+
+  const calendarEvents = (events ?? []).map((event) => {
+    const facility = Array.isArray(event.facility) ? event.facility[0] : event.facility;
+    const entity = Array.isArray(event.entity) ? event.entity[0] : event.entity;
+
+    return {
+      id: event.id,
+      name: event.name,
+      date: event.date,
+      facility: facility?.name ?? "Unassigned facility",
+      entity: entity?.name ?? "Unknown entity",
+      entityType: entity?.type ?? "club",
+      gradeLevel: event.grade_level ?? "HS",
+    };
+  });
+
   return (
     <div className="space-y-6">
       <section className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -18,7 +50,7 @@ export default function CalendarPage() {
         </div>
       </section>
 
-      <CalendarShell />
+      <CalendarShell events={calendarEvents} />
     </div>
   );
 }

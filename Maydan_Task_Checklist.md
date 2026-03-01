@@ -18,10 +18,10 @@
 - [x] Create `.env.local` with all environment variables
 - [x] Add `.env.local` to `.gitignore`
 - [x] Create GitHub repository
-- [ ] Push initial commit to GitHub
-- [ ] Connect Vercel to GitHub repo
-- [ ] Confirm auto-deploy works on push
-- [ ] Confirm live Vercel URL is accessible
+- [x] Push initial commit to GitHub
+- [x] Connect Vercel to GitHub repo
+- [x] Confirm auto-deploy works on push
+- [x] Confirm live Vercel URL is accessible
 
 ### Supabase Project Setup
 - [x] Create Supabase organisation and project
@@ -142,7 +142,7 @@
   - [x] Status badge
   - [x] Approval chain progress indicator (Step 1 → 2 → 3)
   - [x] Rejection reason display (if rejected)
-  - [ ] Resubmit button (if needs_revision)
+  - [x] Resubmit button (if needs_revision)
   - [x] Marketing request details section (if applicable)
 
 ### Approvals Pages
@@ -263,36 +263,36 @@
 
 ## ✅ APPROVAL WORKFLOW
 
-- [ ] Create `actions/approvals.ts` — server actions for approval operations
-- [ ] Build `approveStep` server action
-  - [ ] Update `approval_steps` row to `approved` with timestamp
-  - [ ] Increment `events.current_step`
-  - [ ] Check if more steps remain
-  - [ ] If yes: create notification for next approver + send email
-  - [ ] If no: set event status to `approved`, notify submitter
-- [ ] Build `rejectStep` server action
-  - [ ] Update `approval_steps` row to `rejected` with reason
-  - [ ] Set event status to `needs_revision`
-  - [ ] Notify submitter with reason
-- [ ] Build `suggestAlternative` server action
-  - [ ] Update step with suggested date/time
-  - [ ] Set event to `needs_revision`
-  - [ ] Notify submitter with suggestion
-- [ ] Build `resubmitEvent` server action
-  - [ ] Reset all `approval_steps` to `pending`
-  - [ ] Reset `events.current_step` to 1
-  - [ ] Set event status to `pending`
-  - [ ] Notify Step 1 approver
-- [ ] Wire Approve button to `approveStep`
-- [ ] Wire Reject button to `rejectStep`
-- [ ] Wire Suggest Alternative to `suggestAlternative`
-- [ ] Wire Resubmit button to `resubmitEvent`
-- [ ] Test: approve Step 1 → Step 2 approver notified
-- [ ] Test: approve final step → event approved, submitter notified
-- [ ] Test: reject at Step 1 → event paused, submitter notified
-- [ ] Test: reject at Step 2 → event paused, submitter notified
-- [ ] Test: resubmit → chain restarts from Step 1
-- [ ] Test: Facilities Director receives notification on all submissions
+- [x] Create `actions/approvals.ts` — server actions for approval operations
+- [x] Build `approveStep` server action
+  - [x] Update `approval_steps` row to `approved` with timestamp
+  - [x] Increment `events.current_step`
+  - [x] Check if more steps remain
+  - [x] If yes: create notification for next approver + send email
+  - [x] If no: set event status to `approved`, notify submitter
+- [x] Build `rejectStep` server action
+  - [x] Update `approval_steps` row to `rejected` with reason
+  - [x] Set event status to `needs_revision`
+  - [x] Notify submitter with reason
+- [x] Build `suggestAlternative` server action
+  - [x] Update step with suggested date/time
+  - [x] Set event to `needs_revision`
+  - [x] Notify submitter with suggestion
+- [x] Build `resubmitEvent` server action
+  - [x] Reset all `approval_steps` to `pending`
+  - [x] Reset `events.current_step` to 1
+  - [x] Set event status to `pending`
+  - [x] Notify Step 1 approver
+- [x] Wire Approve button to `approveStep`
+- [x] Wire Reject button to `rejectStep`
+- [x] Wire Suggest Alternative to `suggestAlternative`
+- [x] Wire Resubmit button to `resubmitEvent`
+- [x] Test: approve Step 1 → Step 2 approver notified
+- [x] Test: approve final step → event approved, submitter notified
+- [x] Test: reject at Step 1 → event paused, submitter notified
+- [x] Test: reject at Step 2 → event paused, submitter notified
+- [x] Test: resubmit → chain restarts from Step 1
+- [x] Test: Facilities Director receives notification on all submissions
 
 ---
 
@@ -301,12 +301,12 @@
 ### In-App Notifications
 - [x] Create `actions/notifications.ts`
 - [x] Build `createNotification(userId, eventId, message)` function
-- [ ] Call `createNotification` in all relevant actions:
+- [x] Call `createNotification` in all relevant actions:
   - [x] On event submitted → notify Step 1 approver
   - [x] On event submitted → notify Facilities Director
-  - [ ] On step approved → notify next approver (or submitter if final)
-  - [ ] On step rejected → notify submitter
-  - [ ] On alternative suggested → notify submitter
+  - [x] On step approved → notify next approver (or submitter if final)
+  - [x] On step rejected → notify submitter
+  - [x] On alternative suggested → notify submitter
   - [x] On marketing requested → notify PR staff
 - [x] Build `markAsRead(notificationId)` action
 - [x] Build `markAllAsRead(userId)` action
@@ -316,28 +316,28 @@
 - [ ] Test: correct users receive notifications for each action
 
 ### Real-time (Supabase Realtime)
-- [ ] Set up Realtime subscription for submitters — event status changes
-- [ ] Set up Realtime subscription for approvers — new approval queue items
-- [ ] Set up Realtime subscription for notification bell — new notifications
-- [ ] Test: status updates fire without page refresh
-- [ ] Test: approval queue updates without page refresh
-- [ ] Test: notification bell badge updates in real time
+- [x] Set up Realtime subscription for submitters — event status changes
+- [x] Set up Realtime subscription for approvers — new approval queue items
+- [x] Set up Realtime subscription for notification bell — new notifications
+- [x] Test: status updates fire without page refresh
+- [x] Test: approval queue updates without page refresh
+- [x] Test: notification bell badge updates in real time
 
 ---
 
 ## 📧 EMAIL NOTIFICATIONS (Resend)
 
 - [x] Create Resend account + get API key
-- [ ] Add `RESEND_API_KEY` to `.env.local` and Vercel environment
+- [x] Add `RESEND_API_KEY` to `.env.local` and Vercel environment
 - [x] Create `lib/resend/emails.ts`
-- [ ] Build email templates:
+- [x] Build email templates:
   - [x] `sendApprovalRequestEmail(to, eventName, eventId)` — to approver
-  - [ ] `sendEventApprovedEmail(to, eventName)` — to submitter
-  - [ ] `sendEventRejectedEmail(to, eventName, reason)` — to submitter
-  - [ ] `sendAlternativeSuggestedEmail(to, eventName, date, time)` — to submitter
+  - [x] `sendEventApprovedEmail(to, eventName)` — to submitter
+  - [x] `sendEventRejectedEmail(to, eventName, reason)` — to submitter
+  - [x] `sendAlternativeSuggestedEmail(to, eventName, date, time)` — to submitter
   - [x] `sendFacilitiesNotificationEmail(to, eventName, eventId)` — to Facilities Director
   - [x] `sendMarketingRequestEmail(to, eventName, requestDetails)` — to PR staff
-- [ ] Call correct email function in each server action
+- [x] Call correct email function in each server action
 - [ ] Test all email triggers — confirm delivery in Resend dashboard
 - [ ] Confirm emails render correctly (no broken formatting)
 
@@ -345,12 +345,12 @@
 
 ## 🗓️ CALENDAR
 
-- [ ] Fetch all approved events from DB
-- [ ] Display events on correct calendar dates
-- [ ] Build event summary popover on click
-- [ ] Build filter: by entity type
-- [ ] Build filter: by facility
-- [ ] Build filter: by grade level
+- [x] Fetch all approved events from DB
+- [x] Display events on correct calendar dates
+- [x] Build event summary popover on click
+- [x] Build filter: by entity type
+- [x] Build filter: by facility
+- [x] Build filter: by grade level
 - [ ] Test: approved events appear on calendar
 - [ ] Test: pending/draft events do not appear on calendar
 

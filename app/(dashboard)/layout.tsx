@@ -3,6 +3,7 @@ import { NotificationBell } from "@/components/notifications/notification-bell";
 import { AppSidebar } from "@/components/shared/app-sidebar";
 import { EmptyState } from "@/components/shared/empty-state";
 import { LoadingSkeleton } from "@/components/shared/loading-skeleton";
+import { RealtimeListeners } from "@/components/shared/realtime-listeners";
 import { AppHeader } from "@/components/shared/top-header";
 import { AppToast } from "@/components/shared/toast";
 import { UserAvatar } from "@/components/shared/user-avatar";
@@ -38,6 +39,7 @@ export default async function DashboardLayout({
   return (
     <AuthProvider user={user}>
       <div className="min-h-screen bg-stone-100 text-slate-950">
+        <RealtimeListeners role={user.role} userId={user.id} />
         <div className="mx-auto grid min-h-screen max-w-[1600px] lg:grid-cols-[280px_1fr]">
           <AppSidebar role={user.role} />
           <div className="flex min-h-screen flex-col">
@@ -53,8 +55,8 @@ export default async function DashboardLayout({
                   lines={3}
                 />
                 <EmptyState
-                  title="Live auth, staged data"
-                  description="Authentication and route protection are now wired to Supabase. Event and approval data flows will be connected in later phases."
+                  title="Realtime workspace"
+                  description="Authentication, event submissions, and approval workflow updates are now backed by Supabase."
                 />
                 <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
                   <h2 className="text-lg font-semibold">Current session</h2>
@@ -65,7 +67,7 @@ export default async function DashboardLayout({
                   <div className="mt-4">
                     <AppToast
                       title="Auth session active"
-                      description="This layout now renders against the authenticated Supabase user profile."
+                      description="Live notifications and role-based routing are active for this session."
                       variant="success"
                     />
                   </div>

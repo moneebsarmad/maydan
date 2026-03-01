@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 import { ApprovalChainProgress } from "@/components/approvals/approval-chain-progress";
+import { ResubmitButton } from "@/components/events/resubmit-button";
 import { StatusBadge } from "@/components/events/status-badge";
 import { AppToast } from "@/components/shared/toast";
+import { getShellUser } from "@/lib/supabase/get-shell-user";
 import { createClient } from "@/lib/supabase/server";
 import type { ApprovalStatus } from "@/types";
 
@@ -18,6 +20,12 @@ export default async function EventDetailPage({
   params,
   searchParams,
 }: EventDetailPageProps) {
+  const user = await getShellUser();
+
+  if (!user) {
+    return null;
+  }
+
   const supabase = createClient();
   const { data: event } = await supabase
     .from("events")
@@ -25,6 +33,7 @@ export default async function EventDetailPage({
       `
         id,
         name,
+        submitter_id,
         date,
         start_time,
         end_time,
@@ -82,6 +91,11 @@ export default async function EventDetailPage({
   });
   const rejectionReason =
     approvalSteps?.find((step) => step.status === "rejected")?.reason ?? null;
+  const alternativeSuggestion = approvalSteps?.find(
+    (step) => step.status === "rejected" && step.suggested_date && step.suggested_start_time,
+  );
+  const canResubmit =
+    event.status === "needs_revision" && event.submitter_id === user.id;
 
   return (
     <div className="space-y-6">
@@ -108,6 +122,7 @@ export default async function EventDetailPage({
           </div>
           <div className="flex flex-wrap gap-3">
             <StatusBadge status={event.status ?? "draft"} />
+            {canResubmit ? <ResubmitButton eventId={event.id} /> : null}
           </div>
         </div>
 
@@ -155,6 +170,18 @@ export default async function EventDetailPage({
               </p>
               <p className="mt-3 text-base leading-7 text-rose-950">
                 {rejectionReason}
+              </p>
+            </div>
+          ) : null}
+
+          {alternativeSuggestion ? (
+            <div className="rounded-[1.75rem] border border-sky-200 bg-sky-50/70 p-6 shadow-sm">
+              <p className="text-xs uppercase tracking-[0.24em] text-sky-700">
+                Suggested alternative
+              </p>
+              <p className="mt-3 text-base leading-7 text-slate-950">
+                {alternativeSuggestion.suggested_date} at{" "}
+                {alternativeSuggestion.suggested_start_time}
               </p>
             </div>
           ) : null}

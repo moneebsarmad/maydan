@@ -18,7 +18,7 @@ export function AppHeader({ user }: AppHeaderProps) {
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <h2 className="text-3xl font-semibold tracking-tight text-slate-950">
-              Dashboard Shell
+              Live workspace
             </h2>
             <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-900">
               <ShieldCheck className="h-3.5 w-3.5" />
@@ -30,7 +30,7 @@ export function AppHeader({ user }: AppHeaderProps) {
         <div className="flex flex-wrap items-center gap-3">
           <div className="hidden rounded-full border border-stone-200 bg-stone-50 px-4 py-2 text-sm text-stone-600 md:flex md:items-center md:gap-2">
             <BellDot className="h-4 w-4 text-amber-700" />
-            UI shell only until Phase 3 auth wiring.
+            Realtime notifications are active.
           </div>
           <NotificationBell />
           <UserAvatar name={user.name} email={user.email} />

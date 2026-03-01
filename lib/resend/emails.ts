@@ -50,6 +50,71 @@ export async function sendFacilitiesCcEmail(
   });
 }
 
+export async function sendFacilitiesNotificationEmail(
+  to: string,
+  eventName: string,
+  eventId: string,
+) {
+  return sendFacilitiesCcEmail(to, eventName, eventId);
+}
+
+export async function sendEventApprovedEmail(to: string, eventName: string) {
+  return resend.emails.send({
+    from: fromEmail,
+    to,
+    subject: `Approved: "${eventName}"`,
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #0f172a;">
+        <h2 style="margin-bottom: 8px;">Event approved</h2>
+        <p>Your Maydan event completed the full approval chain.</p>
+        <p><strong>Event:</strong> ${escapeHtml(eventName)}</p>
+      </div>
+    `,
+  });
+}
+
+export async function sendEventRejectedEmail(
+  to: string,
+  eventName: string,
+  reason: string,
+) {
+  return resend.emails.send({
+    from: fromEmail,
+    to,
+    subject: `Revision requested for "${eventName}"`,
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #0f172a;">
+        <h2 style="margin-bottom: 8px;">Revision requested</h2>
+        <p>Your Maydan event needs changes before it can continue.</p>
+        <p><strong>Event:</strong> ${escapeHtml(eventName)}</p>
+        <p><strong>Reason:</strong> ${escapeHtml(reason)}</p>
+      </div>
+    `,
+  });
+}
+
+export async function sendAlternativeSuggestedEmail(
+  to: string,
+  eventName: string,
+  date: string,
+  time: string,
+) {
+  return resend.emails.send({
+    from: fromEmail,
+    to,
+    subject: `Alternative time suggested for "${eventName}"`,
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #0f172a;">
+        <h2 style="margin-bottom: 8px;">Alternative suggested</h2>
+        <p>An approver suggested a different schedule for your Maydan event.</p>
+        <p><strong>Event:</strong> ${escapeHtml(eventName)}</p>
+        <p><strong>Suggested date:</strong> ${escapeHtml(date)}</p>
+        <p><strong>Suggested time:</strong> ${escapeHtml(time)}</p>
+      </div>
+    `,
+  });
+}
+
 export async function sendMarketingRequestEmail(
   to: string,
   eventName: string,

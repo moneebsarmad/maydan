@@ -3,23 +3,24 @@ import { CalendarDays, ChevronRight, User2 } from "lucide-react";
 
 interface ApprovalQueueItemProps {
   approval: {
-    id: string;
+    eventId: string;
     eventName: string;
     submitter: string;
     entity: string;
     date: string;
+    stepNumber: number;
   };
 }
 
 export function ApprovalQueueItem({ approval }: ApprovalQueueItemProps) {
   return (
     <Link
-      href={`/approvals/${approval.id}`}
+      href={`/approvals/${approval.eventId}`}
       className="flex flex-col gap-4 rounded-[1.75rem] border border-stone-200 bg-white p-5 shadow-sm transition hover:border-stone-300 hover:shadow-md md:flex-row md:items-center md:justify-between"
     >
       <div>
         <p className="text-xs uppercase tracking-[0.28em] text-stone-500">
-          {approval.entity}
+          {approval.entity} · Step {approval.stepNumber}
         </p>
         <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
           {approval.eventName}

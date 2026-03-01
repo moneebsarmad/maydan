@@ -1,6 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import {
+  approveStep,
+  rejectStep,
+  suggestAlternative,
+} from "@/app/(dashboard)/approvals/actions";
 import { ConfirmModal } from "@/components/shared/confirm-modal";
 import { AppToast } from "@/components/shared/toast";
 import { Button } from "@/components/ui/button";
@@ -10,19 +16,43 @@ import { Textarea } from "@/components/ui/textarea";
 
 type ActionKind = "approve" | "reject" | "suggest" | null;
 
-export function ApprovalActionShell() {
+interface ApprovalActionShellProps {
+  eventId: string;
+  canAct: boolean;
+}
+
+export function ApprovalActionShell({
+  eventId,
+  canAct,
+}: ApprovalActionShellProps) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const [action, setAction] = useState<ActionKind>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [showRejectReason, setShowRejectReason] = useState(false);
   const [showAlternative, setShowAlternative] = useState(false);
-  const [confirmedAction, setConfirmedAction] = useState<ActionKind>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [suggestedDate, setSuggestedDate] = useState("");
+  const [suggestedTime, setSuggestedTime] = useState("");
+  const [toast, setToast] = useState<{
+    title: string;
+    description: string;
+    variant: "success" | "error" | "info";
+  } | null>(null);
+
+  const confirmDisabled =
+    !action ||
+    isPending ||
+    (action === "reject" && !rejectReason.trim()) ||
+    (action === "suggest" && (!suggestedDate || !suggestedTime));
 
   return (
     <div className="space-y-4 rounded-[1.75rem] border border-stone-200 bg-white p-6 shadow-sm">
-      {confirmedAction ? (
+      {toast ? (
         <AppToast
-          variant={confirmedAction === "approve" ? "success" : "info"}
-          title="Action previewed"
-          description="This static Phase 2 shell captures the UI flow. Workflow wiring begins in Phase 5."
+          variant={toast.variant}
+          title={toast.title}
+          description={toast.description}
         />
       ) : null}
 
@@ -35,9 +65,17 @@ export function ApprovalActionShell() {
         </h2>
       </div>
 
+      {!canAct ? (
+        <div className="rounded-3xl border border-stone-200 bg-stone-50 px-4 py-4 text-sm leading-6 text-stone-600">
+          This event is not currently awaiting your action. You can review the
+          details here, but only the assigned approver can progress this step.
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap gap-3">
         <Button
           type="button"
+          disabled={!canAct || isPending}
           onClick={() => {
             setAction("approve");
             setShowRejectReason(false);
@@ -49,6 +87,7 @@ export function ApprovalActionShell() {
         <Button
           type="button"
           variant="outline"
+          disabled={!canAct || isPending}
           onClick={() => {
             setShowRejectReason((current) => !current);
             setShowAlternative(false);
@@ -60,6 +99,7 @@ export function ApprovalActionShell() {
         <Button
           type="button"
           variant="ghost"
+          disabled={!canAct || isPending}
           onClick={() => {
             setShowAlternative((current) => !current);
             setShowRejectReason(false);
@@ -76,6 +116,8 @@ export function ApprovalActionShell() {
           <Textarea
             id="reject-reason"
             placeholder="Explain what needs to change before resubmission"
+            value={rejectReason}
+            onChange={(event) => setRejectReason(event.target.value)}
           />
         </div>
       ) : null}
@@ -84,11 +126,21 @@ export function ApprovalActionShell() {
         <div className="grid gap-4 rounded-3xl border border-sky-200 bg-sky-50/70 p-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="suggested-date">Suggested date</Label>
-            <Input id="suggested-date" type="date" />
+            <Input
+              id="suggested-date"
+              type="date"
+              value={suggestedDate}
+              onChange={(event) => setSuggestedDate(event.target.value)}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="suggested-time">Suggested time</Label>
-            <Input id="suggested-time" type="time" />
+            <Input
+              id="suggested-time"
+              type="time"
+              value={suggestedTime}
+              onChange={(event) => setSuggestedTime(event.target.value)}
+            />
           </div>
         </div>
       ) : null}
@@ -96,20 +148,65 @@ export function ApprovalActionShell() {
       <Button
         type="button"
         className="w-full justify-center"
-        onClick={() => setAction(action ?? "approve")}
+        disabled={confirmDisabled}
+        onClick={() => setConfirmOpen(true)}
       >
-        Confirm action
+        {isPending ? "Saving..." : "Confirm action"}
       </Button>
 
       <ConfirmModal
-        open={action !== null}
+        open={confirmOpen}
         title="Confirm approval action"
-        description="This reusable modal previews the confirmation step required before destructive or state-changing actions."
+        description="This will immediately update the live approval chain and notify the next recipient."
         confirmLabel="Confirm"
-        onCancel={() => setAction(null)}
+        onCancel={() => setConfirmOpen(false)}
         onConfirm={() => {
-          setConfirmedAction(action);
-          setAction(null);
+          if (!action) {
+            return;
+          }
+
+          startTransition(async () => {
+            let result;
+
+            if (action === "approve") {
+              result = await approveStep({ eventId });
+            } else if (action === "reject") {
+              result = await rejectStep({
+                eventId,
+                reason: rejectReason,
+              });
+            } else {
+              result = await suggestAlternative({
+                eventId,
+                suggestedDate,
+                suggestedTime,
+              });
+            }
+
+            if (!result.success) {
+              setToast({
+                variant: "error",
+                title: "Action failed",
+                description: result.error,
+              });
+              setConfirmOpen(false);
+              return;
+            }
+
+            setToast({
+              variant: action === "approve" ? "success" : "info",
+              title: "Workflow updated",
+              description: result.message,
+            });
+            setConfirmOpen(false);
+            setAction(null);
+            setShowRejectReason(false);
+            setShowAlternative(false);
+            setRejectReason("");
+            setSuggestedDate("");
+            setSuggestedTime("");
+            router.refresh();
+          });
         }}
       />
     </div>
