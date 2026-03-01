@@ -7,6 +7,7 @@ import {
   inviteUserAction,
   updateUserAction,
 } from "@/app/(dashboard)/admin/actions";
+import { AdminNav } from "@/components/admin/admin-nav";
 import { ShellDialog } from "@/components/shared/shell-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +18,7 @@ interface UserListItem {
   name: string;
   email: string;
   role: string;
+  entityId: string | null;
   entityName: string;
   active: boolean;
 }
@@ -62,6 +64,8 @@ export function UsersAdminShell({ users, entities }: UsersAdminShellProps) {
           Add User
         </Button>
       </section>
+
+      <AdminNav />
 
       {feedback ? (
         <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
@@ -282,8 +286,7 @@ export function UsersAdminShell({ users, entities }: UsersAdminShellProps) {
               <select
                 className="h-12 w-full rounded-2xl border border-stone-300 px-4 text-sm"
                 defaultValue={
-                  entities.find((entity) => entity.name === editUser.entityName)?.id ??
-                  ""
+                  editUser.entityId ?? ""
                 }
                 id="edit-entity"
                 name="entityId"

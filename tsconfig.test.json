@@ -3,6 +3,10 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"]
+    },
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -11,8 +15,11 @@
     "types": ["node"]
   },
   "include": [
+    "lib/notification-payloads.ts",
     "lib/routing/**/*.ts",
+    "lib/supabase/route-access.ts",
     "tests/**/*.ts",
-    "types/index.ts"
+    "types/index.ts",
+    "lib/supabase/env.ts"
   ]
 }

@@ -6,6 +6,7 @@ import {
   createEntityAction,
   updateEntityAction,
 } from "@/app/(dashboard)/admin/actions";
+import { AdminNav } from "@/components/admin/admin-nav";
 import { ShellDialog } from "@/components/shared/shell-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +42,12 @@ export function EntitiesAdminShell({
   const [error, setError] = useState<string | null>(null);
 
   const entity = entities.find((item) => item.id === selectedEntity);
+  const groupedEntities = entityTypeOrder
+    .map((type) => ({
+      type,
+      items: entities.filter((item) => item.type === type),
+    }))
+    .filter((group) => group.items.length > 0);
 
   return (
     <div className="space-y-6">
@@ -62,6 +69,8 @@ export function EntitiesAdminShell({
         </Button>
       </section>
 
+      <AdminNav />
+
       {feedback ? (
         <p className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
           {feedback}
@@ -73,34 +82,53 @@ export function EntitiesAdminShell({
         </p>
       ) : null}
 
-      <section className="grid gap-4 lg:grid-cols-3">
-        {entities.map((item) => (
-          <article
-            className="rounded-[1.75rem] border border-stone-200 bg-white p-5 shadow-sm"
-            key={item.id}
-          >
-            <p className="text-xs uppercase tracking-[0.24em] text-stone-500">
-              {item.type}
-            </p>
-            <h2 className="mt-2 text-2xl font-semibold text-slate-950">
-              {item.name}
-            </h2>
-            <p className="mt-3 text-sm leading-6 text-stone-600">
-              Head user assignment: {item.headUserName}
-            </p>
-            <p className="mt-1 text-sm leading-6 text-stone-600">
-              Grade level: {item.gradeLevel ?? "Unspecified"}
-            </p>
-            <Button
-              className="mt-5"
-              size="sm"
-              type="button"
-              variant="outline"
-              onClick={() => setSelectedEntity(item.id)}
-            >
-              Edit entity
-            </Button>
-          </article>
+      <section className="space-y-6">
+        {groupedEntities.map((group) => (
+          <div className="space-y-4" key={group.type}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.22em] text-stone-500">
+                  Entity type
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold text-slate-950">
+                  {formatEntityTypeLabel(group.type)}
+                </h2>
+              </div>
+              <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-700">
+                {group.items.length} total
+              </span>
+            </div>
+            <div className="grid gap-4 lg:grid-cols-3">
+              {group.items.map((item) => (
+                <article
+                  className="rounded-[1.75rem] border border-stone-200 bg-white p-5 shadow-sm"
+                  key={item.id}
+                >
+                  <p className="text-xs uppercase tracking-[0.24em] text-stone-500">
+                    {item.type}
+                  </p>
+                  <h3 className="mt-2 text-2xl font-semibold text-slate-950">
+                    {item.name}
+                  </h3>
+                  <p className="mt-3 text-sm leading-6 text-stone-600">
+                    Head user assignment: {item.headUserName}
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-stone-600">
+                    Grade level: {item.gradeLevel ?? "Unspecified"}
+                  </p>
+                  <Button
+                    className="mt-5"
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                    onClick={() => setSelectedEntity(item.id)}
+                  >
+                    Edit entity
+                  </Button>
+                </article>
+              ))}
+            </div>
+          </div>
         ))}
       </section>
 
@@ -260,6 +288,20 @@ export function EntitiesAdminShell({
       </ShellDialog>
     </div>
   );
+}
+
+const entityTypeOrder = ["club", "house", "department", "athletics"] as const;
+
+function formatEntityTypeLabel(entityType: string) {
+  if (entityType === "athletics") {
+    return "Athletics";
+  }
+
+  if (entityType === "department") {
+    return "Departments";
+  }
+
+  return `${entityType.charAt(0).toUpperCase()}${entityType.slice(1)}s`;
 }
 
 function Field({

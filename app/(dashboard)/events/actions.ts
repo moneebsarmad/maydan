@@ -13,6 +13,10 @@ import {
   sendFacilitiesCcEmail,
   sendMarketingRequestEmail,
 } from "@/lib/resend/emails";
+import {
+  getEventSubmittedNotifications,
+  getMarketingRequestNotifications,
+} from "@/lib/notification-payloads";
 import { createClient } from "@/lib/supabase/server";
 import { eventFormSchema, type EventFormValues } from "@/lib/utils/event-form";
 import type { EntityType, GradeLevel } from "@/types";
@@ -104,16 +108,18 @@ export async function submitEvent(
       throw new Error(stepsError.message);
     }
 
-    await createNotification(
-      approvalChain.approverIds[0],
+    for (const notification of getEventSubmittedNotifications({
       eventId,
-      `Action required: review "${parsedValues.data.name}".`,
-    );
-    await createNotification(
-      approvalChain.ccUserId,
-      eventId,
-      `Facilities Director copied on "${parsedValues.data.name}".`,
-    );
+      eventName: parsedValues.data.name,
+      firstApproverId: approvalChain.approverIds[0],
+      facilitiesDirectorId: approvalChain.ccUserId,
+    })) {
+      await createNotification(
+        notification.userId,
+        notification.eventId,
+        notification.message,
+      );
+    }
 
     const recipients = await getNotificationRecipients(querySupabase, [
       approvalChain.approverIds[0],
@@ -156,11 +162,15 @@ export async function submitEvent(
 
       const prStaffRecipients = await getPRStaffRecipients(querySupabase);
 
-      for (const recipient of prStaffRecipients) {
+      for (const notification of getMarketingRequestNotifications({
+        eventId,
+        eventName: parsedValues.data.name,
+        prStaffIds: prStaffRecipients.map((recipient) => recipient.id),
+      })) {
         await createNotification(
-          recipient.id,
-          eventId,
-          `Marketing requested for "${parsedValues.data.name}".`,
+          notification.userId,
+          notification.eventId,
+          notification.message,
         );
       }
 

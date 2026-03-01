@@ -22,6 +22,7 @@ interface NavItem {
   href: string;
   icon: typeof LayoutDashboard;
   roles: ShellRole[];
+  activePrefix?: string;
 }
 
 const navItems: NavItem[] = [
@@ -54,6 +55,7 @@ const navItems: NavItem[] = [
     href: "/admin/users",
     icon: Settings2,
     roles: ["admin"],
+    activePrefix: "/admin",
   },
 ] as const;
 
@@ -66,7 +68,7 @@ export function AppSidebar({ role, mobile = false }: AppSidebarProps) {
       <nav className="flex gap-2 overflow-x-auto pb-1">
         {items.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname.startsWith(item.href);
+          const isActive = pathname.startsWith(item.activePrefix ?? item.href);
 
           return (
             <Link
@@ -103,7 +105,7 @@ export function AppSidebar({ role, mobile = false }: AppSidebarProps) {
       <nav className="mt-8 space-y-2">
         {items.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname.startsWith(item.href);
+          const isActive = pathname.startsWith(item.activePrefix ?? item.href);
 
           return (
             <Link

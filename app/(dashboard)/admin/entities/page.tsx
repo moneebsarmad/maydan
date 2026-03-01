@@ -9,6 +9,7 @@ export default async function AdminEntitiesPage() {
       .select(
         "id, name, type, grade_level, head_user_id, head_user:users!entities_head_user_id_fkey(name)",
       )
+      .order("type")
       .order("name"),
     supabase
       .from("users")

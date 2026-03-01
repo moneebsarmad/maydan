@@ -7,7 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:routing": "rm -rf .test-dist && tsc -p tsconfig.test.json && node --test .test-dist/tests/approval-router.test.js"
+    "test:routing": "rm -rf .test-dist && tsc -p tsconfig.test.json && node --test .test-dist/tests/approval-router.test.js",
+    "test:foundation-db": "rm -rf .test-dist && tsc -p tsconfig.test.json && node --test .test-dist/tests/foundation-db.test.js",
+    "test:auth-access": "rm -rf .test-dist && tsc -p tsconfig.test.json && node --test .test-dist/tests/auth-access.test.js",
+    "test:notifications": "rm -rf .test-dist && tsc -p tsconfig.test.json && node --test .test-dist/tests/notification-payloads.test.js",
+    "test:workflow-verification": "rm -rf .test-dist && tsc -p tsconfig.test.json && node --test .test-dist/tests/workflow-verification.test.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

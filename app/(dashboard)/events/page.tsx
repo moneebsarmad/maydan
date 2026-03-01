@@ -1,10 +1,28 @@
 import Link from "next/link";
 import { EmptyState } from "@/components/shared/empty-state";
 import { EventCard } from "@/components/events/event-card";
+import { EventFilterBar } from "@/components/events/event-filter-bar";
 import { getShellUser } from "@/lib/supabase/get-shell-user";
 import { createClient } from "@/lib/supabase/server";
+import type { EventStatus } from "@/types";
 
-export default async function EventsPage() {
+const allowedStatuses: EventStatus[] = [
+  "draft",
+  "pending",
+  "needs_revision",
+  "approved",
+  "cancelled",
+];
+
+interface EventsPageProps {
+  searchParams?: {
+    status?: string;
+    entity?: string;
+    date?: string;
+  };
+}
+
+export default async function EventsPage({ searchParams }: EventsPageProps) {
   const user = await getShellUser();
 
   if (!user) {
@@ -12,6 +30,9 @@ export default async function EventsPage() {
   }
 
   const supabase = createClient();
+  const selectedStatus = normalizeStatus(searchParams?.status);
+  const selectedEntityId = normalizeSearchValue(searchParams?.entity);
+  const selectedDate = normalizeSearchValue(searchParams?.date);
   let query = supabase
     .from("events")
     .select(
@@ -25,6 +46,7 @@ export default async function EventsPage() {
         grade_level,
         marketing_needed,
         status,
+        entity_id,
         entity:entities!events_entity_id_fkey(name, type),
         facility:facilities!events_facility_id_fkey(name)
       `,
@@ -35,7 +57,22 @@ export default async function EventsPage() {
     query = query.eq("submitter_id", user.id);
   }
 
-  const { data: events } = await query;
+  if (selectedStatus) {
+    query = query.eq("status", selectedStatus);
+  }
+
+  if (selectedEntityId) {
+    query = query.eq("entity_id", selectedEntityId);
+  }
+
+  if (selectedDate) {
+    query = query.eq("date", selectedDate);
+  }
+
+  const [{ data: events }, { data: entities }] = await Promise.all([
+    query,
+    supabase.from("entities").select("id, name").order("name"),
+  ]);
 
   const eventCards = (events ?? []).map((event) => {
     const entity = Array.isArray(event.entity) ? event.entity[0] : event.entity;
@@ -86,6 +123,18 @@ export default async function EventsPage() {
         ) : null}
       </section>
 
+      <EventFilterBar
+        entities={
+          entities?.map((entity) => ({
+            id: entity.id,
+            name: entity.name,
+          })) ?? []
+        }
+        selectedDate={selectedDate}
+        selectedEntityId={selectedEntityId}
+        selectedStatus={selectedStatus}
+      />
+
       {eventCards.length > 0 ? (
         <section className="space-y-4">
           {eventCards.map((event) => (
@@ -108,4 +157,13 @@ export default async function EventsPage() {
       )}
     </div>
   );
+}
+
+function normalizeSearchValue(value?: string) {
+  return String(value ?? "").trim();
+}
+
+function normalizeStatus(value?: string) {
+  const normalizedValue = normalizeSearchValue(value) as EventStatus;
+  return allowedStatuses.includes(normalizedValue) ? normalizedValue : "";
 }

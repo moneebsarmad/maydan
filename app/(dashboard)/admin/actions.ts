@@ -3,24 +3,36 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import type { UserRole } from "@/types";
+import {
+  getZodErrorMessage,
+  inviteUserFormSchema,
+  updateUserFormSchema,
+} from "@/lib/utils/admin-forms";
 
 const passwordRedirectUrl = `${
   process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
 }/update-password`;
 
 export async function inviteUserAction(formData: FormData) {
-  const adminClient = createAdminClient();
   await requireAdmin();
+  const parsedInput = inviteUserFormSchema.safeParse({
+    name: formData.get("name"),
+    email: formData.get("email"),
+    role: formData.get("role"),
+    entityId: formData.get("entityId"),
+  });
 
-  const name = String(formData.get("name") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const role = String(formData.get("role") ?? "").trim() as UserRole;
-  const entityId = normalizeNullableString(formData.get("entityId"));
-
-  if (!name || !email || !role) {
-    throw new Error("Name, email, and role are required.");
+  if (!parsedInput.success) {
+    throw new Error(getZodErrorMessage(parsedInput.error));
   }
+
+  const adminClient = createAdminClient();
+  const {
+    name,
+    role,
+    entityId,
+  } = parsedInput.data;
+  const email = parsedInput.data.email.toLowerCase();
 
   let authUser = await findAuthUserByEmail(adminClient, email);
 
@@ -65,18 +77,20 @@ export async function inviteUserAction(formData: FormData) {
 }
 
 export async function updateUserAction(formData: FormData) {
-  const adminClient = createAdminClient();
   await requireAdmin();
+  const parsedInput = updateUserFormSchema.safeParse({
+    userId: formData.get("userId"),
+    name: formData.get("name"),
+    role: formData.get("role"),
+    entityId: formData.get("entityId"),
+  });
 
-  const userId = String(formData.get("userId") ?? "").trim();
-  const name = String(formData.get("name") ?? "").trim();
-  const role = String(formData.get("role") ?? "").trim() as UserRole;
-  const entityId = normalizeNullableString(formData.get("entityId"));
-
-  if (!userId || !name || !role) {
-    throw new Error("User id, name, and role are required.");
+  if (!parsedInput.success) {
+    throw new Error(getZodErrorMessage(parsedInput.error));
   }
 
+  const adminClient = createAdminClient();
+  const { userId, name, role, entityId } = parsedInput.data;
   const { error } = await adminClient
     .from("users")
     .update({

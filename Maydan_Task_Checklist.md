@@ -31,7 +31,7 @@
 - [x] Create `lib/supabase/server.ts` (server client)
 - [x] Create `lib/supabase/middleware.ts` (session refresh)
 - [x] Add middleware to `middleware.ts` in root
-- [ ] Test Supabase connection — confirm no errors in console
+- [x] Test Supabase connection — confirm no errors in console
 
 ---
 
@@ -63,7 +63,7 @@
 - [x] Write RLS policy: admin full access to all tables
 - [x] Write RLS policy: facilities director reads all events
 - [x] Write RLS policy: users read own notifications only
-- [ ] Test RLS with two separate test accounts — confirm no data leakage
+- [x] Test RLS with two separate test accounts — confirm no data leakage
 
 ### Seed Data
 - [x] Seed facilities: Auditorium, Gym, Main Field, Classroom, MPH, Library, Conference Room
@@ -113,7 +113,7 @@
 ### Events Pages
 - [x] Build `/events` — events list page
   - [x] Event cards with status badges
-  - [ ] Filter bar (status, entity, date)
+  - [x] Filter bar (status, entity, date)
   - [x] "Submit New Event" button
 - [x] Build `/events/new` — full submission form (static first)
   - [x] Event Name field
@@ -134,6 +134,7 @@
     - [x] Priority select
     - [x] File upload input
   - [ ] Additional Notes textarea
+    - Intentionally omitted for V1: approved schema has no `events.additional_notes` column, and the schema lock was preserved.
   - [x] Submit button
   - [x] Form validation errors display correctly
   - [x] Marketing sub-form shows on toggle, hides on toggle off
@@ -171,7 +172,7 @@
   - [x] Edit User button + modal form
   - [x] Deactivate User button + confirmation
 - [x] Build `/admin/entities` — entity management
-  - [ ] Entities list grouped by type
+  - [x] Entities list grouped by type
   - [x] Add Entity button + modal form
   - [x] Edit Entity (assign head user)
 - [x] Build `/admin/facilities` — facility management
@@ -205,9 +206,9 @@
 - [x] Middleware redirects authenticated users away from `/login`
 - [x] Role guard: `/admin/*` routes → admin only
 - [x] Role guard: `/approvals/*` routes → approvers and admin only
-- [ ] Test: submitter cannot access `/admin`
-- [ ] Test: submitter cannot access `/approvals`
-- [ ] Test: approver can access `/approvals` but not `/admin`
+- [x] Test: submitter cannot access `/admin`
+- [x] Test: submitter cannot access `/approvals`
+- [x] Test: approver can access `/approvals` but not `/admin`
 
 ---
 
@@ -228,7 +229,7 @@
 - [x] Build `saveDraft` server action (saves without submitting)
 - [x] Wire draft save to form
 - [x] Test: event inserted correctly in DB
-  - [ ] Test: correct approval steps created for each entity type
+  - [x] Test: correct approval steps created for each entity type
 - [x] Test: event status is `pending` after submission
 
 ---
@@ -318,7 +319,7 @@
 - [x] Wire NotificationBell to fetch unread count
 - [x] Wire NotificationDropdown to list recent notifications
 - [x] Wire mark as read on notification click
-- [ ] Test: correct users receive notifications for each action
+- [x] Test: correct users receive notifications for each action
 
 ### Real-time (Supabase Realtime)
 - [x] Set up Realtime subscription for submitters — event status changes
@@ -356,8 +357,8 @@
 - [x] Build filter: by entity type
 - [x] Build filter: by facility
 - [x] Build filter: by grade level
-- [ ] Test: approved events appear on calendar
-- [ ] Test: pending/draft events do not appear on calendar
+- [x] Test: approved events appear on calendar
+- [x] Test: pending/draft events do not appear on calendar
 
 ---
 
@@ -365,16 +366,16 @@
 
 ### User Management
 - [x] Fetch and display all users
-- [ ] Build Add User modal form with Zod validation
+- [x] Build Add User modal form with Zod validation
 - [x] On Add User: create Supabase Auth account + insert into `users` table
 - [x] Send Supabase invite email to new user
 - [x] Build Edit User modal — update role and entity assignment
 - [x] Build Deactivate User — sets `active: false`, blocks login
 - [ ] Test: new user receives invite email
-- [ ] Test: deactivated user cannot log in
+- [x] Test: deactivated user cannot log in
 
 ### Entity Management
-- [ ] Fetch and display all entities grouped by type
+- [x] Fetch and display all entities grouped by type
 - [x] Build Add Entity modal
 - [x] Build Edit Entity modal — assign head user
 - [ ] Test: new entity appears in submission form dropdown
@@ -384,12 +385,12 @@
 - [x] Build Add Facility modal
 - [x] Build Edit Facility modal
 - [x] Build Deactivate Facility — removes from submission form
-- [ ] Test: deactivated facility does not appear in event form
+- [x] Test: deactivated facility does not appear in event form
 
 ### Audit Log
-- [ ] Build basic audit log view — all events with status history
-- [ ] Show: event name, submitter, entity, current status, last updated
-- [ ] Filter by status, entity, date range
+- [x] Build basic audit log view — all events with status history
+- [x] Show: event name, submitter, entity, current status, last updated
+- [x] Filter by status, entity, date range
 
 ---
 

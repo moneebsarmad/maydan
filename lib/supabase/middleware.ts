@@ -5,8 +5,7 @@ import {
   getSupabaseUrl,
   isSupabaseConfigured,
 } from "@/lib/supabase/env";
-
-const authRoutes = new Set(["/login", "/reset-password", "/update-password"]);
+import { authRoutes, getRouteRedirect } from "@/lib/supabase/route-access";
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({
@@ -47,17 +46,17 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const pathname = request.nextUrl.pathname;
-  const isProtectedRoute =
-    pathname.startsWith("/dashboard") ||
-    pathname.startsWith("/events") ||
-    pathname.startsWith("/approvals") ||
-    pathname.startsWith("/calendar") ||
-    pathname.startsWith("/admin");
+  const unauthenticatedRedirect = getRouteRedirect({
+    pathname,
+    isAuthenticated: Boolean(user),
+  });
 
-  if (!user && isProtectedRoute) {
+  if (!user && unauthenticatedRedirect) {
     const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = "/login";
-    redirectUrl.searchParams.set("next", pathname);
+    redirectUrl.pathname = unauthenticatedRedirect.pathname;
+    if (unauthenticatedRedirect.next) {
+      redirectUrl.searchParams.set("next", unauthenticatedRedirect.next);
+    }
     return NextResponse.redirect(redirectUrl);
   }
 
@@ -68,34 +67,23 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (user && isProtectedRoute) {
+  if (user) {
     const { data: profile } = await supabase
       .from("users")
       .select("role, active")
       .eq("id", user.id)
       .maybeSingle();
 
-    if (!profile?.active) {
-      const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = "/login";
-      redirectUrl.search = "";
-      return NextResponse.redirect(redirectUrl);
-    }
+    const protectedRedirect = getRouteRedirect({
+      pathname,
+      isAuthenticated: true,
+      userRole: profile?.role,
+      userActive: profile?.active,
+    });
 
-    if (pathname.startsWith("/admin") && profile?.role !== "admin") {
+    if (protectedRedirect) {
       const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = "/dashboard";
-      redirectUrl.search = "";
-      return NextResponse.redirect(redirectUrl);
-    }
-
-    if (
-      pathname.startsWith("/approvals") &&
-      profile?.role !== "admin" &&
-      profile?.role !== "approver"
-    ) {
-      const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = "/dashboard";
+      redirectUrl.pathname = protectedRedirect.pathname;
       redirectUrl.search = "";
       return NextResponse.redirect(redirectUrl);
     }

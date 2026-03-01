@@ -11,6 +11,13 @@ import {
   sendFacilityConflictFlaggedEmail,
   sendFacilitiesNotificationEmail,
 } from "@/lib/resend/emails";
+import {
+  getAlternativeNotifications,
+  getFinalApprovalNotifications,
+  getIntermediateApprovalNotifications,
+  getRejectionNotifications,
+  getResubmissionNotifications,
+} from "@/lib/notification-payloads";
 import { createClient } from "@/lib/supabase/server";
 
 const eventActionSchema = z.object({
@@ -105,11 +112,17 @@ export async function approveStep(input: {
         throw new Error(eventError.message);
       }
 
-      await createNotification(
-        nextStep.approverId,
-        parsedInput.data.eventId,
-        `Action required: review "${event.name}".`,
-      );
+      for (const notification of getIntermediateApprovalNotifications({
+        eventId: parsedInput.data.eventId,
+        eventName: event.name,
+        nextApproverId: nextStep.approverId,
+      })) {
+        await createNotification(
+          notification.userId,
+          notification.eventId,
+          notification.message,
+        );
+      }
 
       const nextApprover = await getUserContact(supabase, nextStep.approverId);
 
@@ -145,11 +158,17 @@ export async function approveStep(input: {
       throw new Error(eventError.message);
     }
 
-    await createNotification(
-      event.submitterId,
-      parsedInput.data.eventId,
-      `"${event.name}" has been fully approved.`,
-    );
+    for (const notification of getFinalApprovalNotifications({
+      eventId: parsedInput.data.eventId,
+      eventName: event.name,
+      submitterId: event.submitterId,
+    })) {
+      await createNotification(
+        notification.userId,
+        notification.eventId,
+        notification.message,
+      );
+    }
 
     const submitter = await getUserContact(supabase, event.submitterId);
 
@@ -231,11 +250,18 @@ export async function rejectStep(input: {
       throw new Error(eventError.message);
     }
 
-    await createNotification(
-      event.submitterId,
-      parsedInput.data.eventId,
-      `Revision requested for "${event.name}": ${parsedInput.data.reason}`,
-    );
+    for (const notification of getRejectionNotifications({
+      eventId: parsedInput.data.eventId,
+      eventName: event.name,
+      submitterId: event.submitterId,
+      reason: parsedInput.data.reason,
+    })) {
+      await createNotification(
+        notification.userId,
+        notification.eventId,
+        notification.message,
+      );
+    }
 
     const submitter = await getUserContact(supabase, event.submitterId);
 
@@ -324,11 +350,19 @@ export async function suggestAlternative(input: {
       throw new Error(eventError.message);
     }
 
-    await createNotification(
-      event.submitterId,
-      parsedInput.data.eventId,
-      `Alternative suggested for "${event.name}": ${parsedInput.data.suggestedDate} at ${parsedInput.data.suggestedTime}.`,
-    );
+    for (const notification of getAlternativeNotifications({
+      eventId: parsedInput.data.eventId,
+      eventName: event.name,
+      submitterId: event.submitterId,
+      suggestedDate: parsedInput.data.suggestedDate,
+      suggestedTime: parsedInput.data.suggestedTime,
+    })) {
+      await createNotification(
+        notification.userId,
+        notification.eventId,
+        notification.message,
+      );
+    }
 
     const submitter = await getUserContact(supabase, event.submitterId);
 
@@ -422,19 +456,17 @@ export async function resubmitEvent(input: {
       throw new Error(eventError.message);
     }
 
-    await createNotification(
-      firstStep.approverId,
-      parsedInput.data.eventId,
-      `Action required: review "${event.name}".`,
-    );
-
     const facilitiesRecipient = await getFacilitiesRecipient(supabase);
-
-    if (facilitiesRecipient) {
+    for (const notification of getResubmissionNotifications({
+      eventId: parsedInput.data.eventId,
+      eventName: event.name,
+      firstApproverId: firstStep.approverId,
+      facilitiesDirectorId: facilitiesRecipient?.id,
+    })) {
       await createNotification(
-        facilitiesRecipient.id,
-        parsedInput.data.eventId,
-        `Facilities Director copied on resubmitted event "${event.name}".`,
+        notification.userId,
+        notification.eventId,
+        notification.message,
       );
     }
 
