@@ -1,6 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
-import { isSupabaseConfigured } from "@/lib/supabase/env";
+import {
+  getSupabaseAnonKey,
+  getSupabaseUrl,
+  isSupabaseConfigured,
+} from "@/lib/supabase/env";
 
 const authRoutes = new Set(["/login", "/reset-password", "/update-password"]);
 
@@ -14,8 +18,8 @@ export async function updateSession(request: NextRequest) {
   }
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    getSupabaseUrl(),
+    getSupabaseAnonKey(),
     {
       cookies: {
         getAll() {

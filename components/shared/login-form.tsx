@@ -24,34 +24,43 @@ export function LoginForm() {
         const password = String(formData.get("password") ?? "");
 
         startTransition(async () => {
-          const supabase = createClient();
-          const { data, error: signInError } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-          });
+          try {
+            const supabase = createClient();
+            const { data, error: signInError } =
+              await supabase.auth.signInWithPassword({
+                email,
+                password,
+              });
 
-          if (signInError) {
-            setError(signInError.message);
-            return;
-          }
+            if (signInError) {
+              setError(signInError.message);
+              return;
+            }
 
-          const { data: profile, error: profileError } = await supabase
-            .from("users")
-            .select("active")
-            .eq("id", data.user.id)
-            .maybeSingle();
+            const { data: profile, error: profileError } = await supabase
+              .from("users")
+              .select("active")
+              .eq("id", data.user.id)
+              .maybeSingle();
 
-          if (profileError || !profile?.active) {
-            await supabase.auth.signOut();
+            if (profileError || !profile?.active) {
+              await supabase.auth.signOut();
+              setError(
+                profileError?.message ||
+                  "This account is not active in Maydan. Contact an administrator.",
+              );
+              return;
+            }
+
+            router.replace("/dashboard");
+            router.refresh();
+          } catch (error) {
             setError(
-              profileError?.message ||
-                "This account is not active in Maydan. Contact an administrator.",
+              error instanceof Error
+                ? error.message
+                : "Unable to sign in right now.",
             );
-            return;
           }
-
-          router.replace("/dashboard");
-          router.refresh();
         });
       }}
     >
