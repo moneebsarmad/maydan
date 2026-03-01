@@ -1,12 +1,7 @@
 import { AuthProvider } from "@/components/shared/auth-provider";
-import { NotificationBell } from "@/components/notifications/notification-bell";
 import { AppSidebar } from "@/components/shared/app-sidebar";
-import { EmptyState } from "@/components/shared/empty-state";
-import { LoadingSkeleton } from "@/components/shared/loading-skeleton";
 import { RealtimeListeners } from "@/components/shared/realtime-listeners";
 import { AppHeader } from "@/components/shared/top-header";
-import { AppToast } from "@/components/shared/toast";
-import { UserAvatar } from "@/components/shared/user-avatar";
 import { getShellUser } from "@/lib/supabase/get-shell-user";
 
 export default async function DashboardLayout({
@@ -47,33 +42,7 @@ export default async function DashboardLayout({
             <div className="border-b border-stone-200 bg-white/70 px-4 py-4 backdrop-blur lg:hidden">
               <AppSidebar role={user.role} mobile />
             </div>
-            <main className="flex-1 px-4 py-6 md:px-6 lg:px-10 lg:py-10">
-              {children}
-              <div className="mt-8 grid gap-4 xl:grid-cols-3">
-                <LoadingSkeleton
-                  className="h-28 rounded-3xl bg-white shadow-sm"
-                  lines={3}
-                />
-                <EmptyState
-                  title="Realtime workspace"
-                  description="Authentication, event submissions, and approval workflow updates are now backed by Supabase."
-                />
-                <div className="rounded-3xl border border-stone-200 bg-white p-5 shadow-sm">
-                  <h2 className="text-lg font-semibold">Current session</h2>
-                  <div className="mt-4 flex flex-wrap items-center gap-4">
-                    <UserAvatar name={user.name} email={user.email} />
-                    <NotificationBell />
-                  </div>
-                  <div className="mt-4">
-                    <AppToast
-                      title="Auth session active"
-                      description="Live notifications and role-based routing are active for this session."
-                      variant="success"
-                    />
-                  </div>
-                </div>
-              </div>
-            </main>
+            <main className="flex-1 px-4 py-6 md:px-6 lg:px-10 lg:py-10">{children}</main>
           </div>
         </div>
       </div>
