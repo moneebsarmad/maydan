@@ -35,6 +35,7 @@ export function AdminNav() {
           <Link
             key={link.href}
             href={link.href}
+            prefetch={false}
             className={cn(
               "inline-flex items-center rounded-full border px-4 py-2 text-sm font-medium transition",
               isActive

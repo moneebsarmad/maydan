@@ -71,6 +71,7 @@ export function EventCard({ event }: EventCardProps) {
         </div>
         <Link
           href={`/events/${event.id}`}
+          prefetch={false}
           className="text-sm font-semibold text-slate-950 transition hover:text-amber-900"
         >
           View details

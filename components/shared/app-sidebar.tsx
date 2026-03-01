@@ -74,6 +74,7 @@ export function AppSidebar({ role, mobile = false }: AppSidebarProps) {
             <Link
               key={item.href}
               href={item.href}
+              prefetch={false}
               className={cn(
                 "inline-flex min-w-fit items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition",
                 isActive
@@ -111,6 +112,7 @@ export function AppSidebar({ role, mobile = false }: AppSidebarProps) {
             <Link
               key={item.href}
               href={item.href}
+              prefetch={false}
               className={cn(
                 "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition",
                 isActive

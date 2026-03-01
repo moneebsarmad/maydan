@@ -120,6 +120,7 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
         {canSubmitEvents ? (
           <Link
             href="/events/new"
+            prefetch={false}
             className="inline-flex items-center justify-center rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
           >
             Submit New Event

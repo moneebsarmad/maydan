@@ -16,6 +16,7 @@ export function ApprovalQueueItem({ approval }: ApprovalQueueItemProps) {
   return (
     <Link
       href={`/approvals/${approval.eventId}`}
+      prefetch={false}
       className="flex flex-col gap-4 rounded-[1.75rem] border border-stone-200 bg-white p-5 shadow-sm transition hover:border-stone-300 hover:shadow-md md:flex-row md:items-center md:justify-between"
     >
       <div>

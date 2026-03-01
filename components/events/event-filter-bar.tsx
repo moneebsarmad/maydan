@@ -100,6 +100,7 @@ export function EventFilterBar({
           <Link
             className="inline-flex h-12 items-center justify-center rounded-full border border-stone-200 px-5 text-sm font-semibold text-stone-700 transition hover:border-stone-300 hover:bg-stone-50"
             href="/events"
+            prefetch={false}
           >
             Clear
           </Link>

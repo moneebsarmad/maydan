@@ -227,6 +227,7 @@ export default async function DashboardPage() {
                 <Link
                   href={item.href}
                   key={item.id}
+                  prefetch={false}
                   className="flex items-start justify-between gap-4 rounded-2xl bg-stone-50 px-4 py-4 transition hover:bg-stone-100"
                 >
                   <div>
@@ -267,6 +268,7 @@ export default async function DashboardPage() {
               </div>
               <Link
                 href="/approvals"
+                prefetch={false}
                 className="text-sm font-semibold text-slate-950 transition hover:text-amber-900"
               >
                 View all
@@ -279,6 +281,7 @@ export default async function DashboardPage() {
                   <Link
                     href={`/approvals/${item.eventId}`}
                     key={item.id}
+                    prefetch={false}
                     className="block rounded-2xl border border-stone-200 px-4 py-4 transition hover:border-stone-300 hover:bg-stone-50"
                   >
                     <p className="text-xs uppercase tracking-[0.18em] text-stone-500">
@@ -328,6 +331,7 @@ export default async function DashboardPage() {
                     <Link
                       href={`/events/${event.id}`}
                       key={event.id}
+                      prefetch={false}
                       className="block rounded-2xl border border-stone-200 px-4 py-4 transition hover:border-stone-300 hover:bg-stone-50"
                     >
                       <div className="flex items-start justify-between gap-3">
