@@ -46,6 +46,7 @@ export const inviteUserFormSchema = z.object({
   role: z.enum(roleOptions, {
     required_error: "Select a role.",
   }),
+  title: trimmedOptionalString,
   entityId: trimmedOptionalUuid,
 });
 
@@ -55,6 +56,7 @@ export const updateUserFormSchema = z.object({
   role: z.enum(roleOptions, {
     required_error: "Select a role.",
   }),
+  title: trimmedOptionalString,
   entityId: trimmedOptionalUuid,
 });
 

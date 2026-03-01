@@ -31,6 +31,7 @@ interface UserListItem {
   name: string;
   email: string;
   role: string;
+  title: string | null;
   entityId: string | null;
   entityName: string;
   active: boolean;
@@ -66,6 +67,7 @@ export function UsersAdminShell({ users, entities }: UsersAdminShellProps) {
       name: "",
       email: "",
       role: "staff",
+      title: undefined,
       entityId: undefined,
     },
   });
@@ -75,9 +77,12 @@ export function UsersAdminShell({ users, entities }: UsersAdminShellProps) {
       userId: "",
       name: "",
       role: "staff",
+      title: undefined,
       entityId: undefined,
     },
   });
+  const addRole = addForm.watch("role");
+  const editRole = editForm.watch("role");
 
   useEffect(() => {
     if (!editUser) {
@@ -88,6 +93,7 @@ export function UsersAdminShell({ users, entities }: UsersAdminShellProps) {
       userId: editUser.id,
       name: editUser.name,
       role: editUser.role as UpdateUserFormValues["role"],
+      title: editUser.title ?? undefined,
       entityId: editUser.entityId ?? undefined,
     });
   }, [editForm, editUser]);
@@ -98,6 +104,7 @@ export function UsersAdminShell({ users, entities }: UsersAdminShellProps) {
         name: "",
         email: "",
         role: "staff",
+        title: undefined,
         entityId: undefined,
       });
     }
@@ -143,7 +150,7 @@ export function UsersAdminShell({ users, entities }: UsersAdminShellProps) {
                 key={user.id}
               >
                 <p className="text-xs uppercase tracking-[0.22em] text-stone-500">
-                  {user.role}
+                  {user.title ?? user.role}
                 </p>
                 <h2 className="mt-2 text-xl font-semibold text-slate-950">
                   {user.name}
@@ -190,7 +197,7 @@ export function UsersAdminShell({ users, entities }: UsersAdminShellProps) {
               >
                 <span className="font-semibold text-slate-950">{user.name}</span>
                 <span>{user.email}</span>
-                <span>{user.role}</span>
+                <span>{user.title ?? user.role}</span>
                 <span>{user.entityName}</span>
                 <span>{user.active ? "Active" : "Inactive"}</span>
                 <span className="flex flex-wrap gap-2">
@@ -285,6 +292,18 @@ export function UsersAdminShell({ users, entities }: UsersAdminShellProps) {
             </select>
             <FormError message={addForm.formState.errors.role?.message} />
           </div>
+
+          <Field
+            label="Title"
+            placeholder={addRole === "admin" ? "Admin" : "Optional routing title"}
+            registration={addForm.register("title")}
+            disabled={addRole === "admin"}
+          />
+          <p className="text-xs leading-5 text-stone-500">
+            Use routing titles like `HS Principal`, `MS Principal`,
+            `Facilities Director`, or `Department Head` when applicable.
+          </p>
+          <FormError message={addForm.formState.errors.title?.message} />
 
           <div className="space-y-2">
             <Label htmlFor="new-entity">Entity</Label>
@@ -383,6 +402,20 @@ export function UsersAdminShell({ users, entities }: UsersAdminShellProps) {
               <FormError message={editForm.formState.errors.role?.message} />
             </div>
 
+            <Field
+              label="Title"
+              placeholder={
+                editRole === "admin" ? "Admin" : "Optional routing title"
+              }
+              registration={editForm.register("title")}
+              disabled={editRole === "admin"}
+            />
+            <p className="text-xs leading-5 text-stone-500">
+              Keep routing-critical titles accurate so approval chains continue
+              resolving correctly.
+            </p>
+            <FormError message={editForm.formState.errors.title?.message} />
+
             <div className="space-y-2">
               <Label htmlFor="edit-entity">Entity</Label>
               <select
@@ -458,16 +491,23 @@ function Field({
   placeholder,
   registration,
   type = "text",
+  disabled = false,
 }: {
   label: string;
   placeholder?: string;
   registration: UseFormRegisterReturn;
   type?: string;
+  disabled?: boolean;
 }) {
   return (
     <div className="space-y-2">
       <Label>{label}</Label>
-      <Input placeholder={placeholder} type={type} {...registration} />
+      <Input
+        disabled={disabled}
+        placeholder={placeholder}
+        type={type}
+        {...registration}
+      />
     </div>
   );
 }

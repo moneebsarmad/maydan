@@ -8,8 +8,13 @@ import {
   markAllAsRead,
   markAsRead,
 } from "@/app/(dashboard)/notifications/actions";
-import { LoadingLabel } from "@/components/shared/loading-label";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 interface NotificationDropdownProps {
@@ -52,10 +57,12 @@ export function NotificationDropdown({
   };
 
   return (
-    <div className="absolute right-0 z-20 mt-3 w-96 rounded-3xl border border-stone-200 bg-white p-4 shadow-xl">
-      <div className="flex items-center justify-between gap-3">
+    <DropdownMenuContent align="end" className="w-96 p-4">
+      <div className="flex items-center justify-between gap-3 px-1">
         <div>
-          <p className="text-sm font-semibold text-slate-950">Notifications</p>
+          <DropdownMenuLabel className="px-0 py-0 text-sm font-semibold text-slate-950">
+            Notifications
+          </DropdownMenuLabel>
           <p className="mt-1 text-xs uppercase tracking-[0.16em] text-stone-500">
             Unread {unreadCount}
           </p>
@@ -67,28 +74,30 @@ export function NotificationDropdown({
           disabled={isPending || unreadCount === 0}
           onClick={handleMarkAllAsRead}
         >
-          {isPending ? <LoadingLabel label="Saving..." /> : "Mark all read"}
+          Mark all read
         </Button>
       </div>
 
+      <DropdownMenuSeparator className="mx-0" />
+
       {notifications.length > 0 ? (
-        <div className="mt-4 space-y-3">
+        <div className="space-y-2">
           {notifications.map((notification) => (
-            <button
-              type="button"
+            <DropdownMenuItem
               key={notification.id}
-              disabled={isPending}
-              onClick={() =>
-                handleNotificationClick(notification.id, notification.eventId)
-              }
               className={cn(
-                "flex w-full items-start gap-2 rounded-2xl px-3 py-3 text-left text-sm transition hover:bg-stone-50",
+                "items-start gap-2 rounded-2xl px-3 py-3 text-left text-sm",
                 notification.read ? "bg-white text-stone-600" : "bg-stone-50 text-stone-800",
               )}
+              disabled={isPending}
+              onSelect={(event) => {
+                event.preventDefault();
+                handleNotificationClick(notification.id, notification.eventId);
+              }}
             >
               <Dot
                 className={cn(
-                  "mt-0.5 h-5 w-5",
+                  "mt-0.5 h-5 w-5 shrink-0",
                   notification.read ? "text-stone-300" : "text-amber-600",
                 )}
               />
@@ -101,20 +110,15 @@ export function NotificationDropdown({
                       })
                     : "recently"}
                 </p>
-                {isPending ? (
-                  <p className="mt-2 text-xs uppercase tracking-[0.14em] text-stone-500">
-                    Updating...
-                  </p>
-                ) : null}
               </div>
-            </button>
+            </DropdownMenuItem>
           ))}
         </div>
       ) : (
-        <div className="mt-4 rounded-2xl bg-stone-50 px-4 py-4 text-sm text-stone-600">
+        <div className="rounded-2xl bg-stone-50 px-4 py-4 text-sm text-stone-600">
           No notifications yet.
         </div>
       )}
-    </div>
+    </DropdownMenuContent>
   );
 }

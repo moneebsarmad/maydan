@@ -7,7 +7,7 @@ export default async function AdminUsersPage() {
     supabase
       .from("users")
       .select(
-        "id, name, email, role, active, entity_id, entity:entities!users_entity_id_fkey(name)",
+        "id, name, email, role, title, active, entity_id, entity:entities!users_entity_id_fkey(name)",
       )
       .order("name"),
     supabase.from("entities").select("id, name").order("name"),
@@ -30,6 +30,7 @@ export default async function AdminUsersPage() {
             name: user.name,
             email: user.email,
             role: user.role,
+            title: user.title,
             entityId: user.entity_id,
             entityName: entity?.name ?? "Unassigned",
             active: user.active ?? true,

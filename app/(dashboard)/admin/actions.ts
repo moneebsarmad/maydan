@@ -23,6 +23,7 @@ export async function inviteUserAction(formData: FormData) {
     name: formData.get("name"),
     email: formData.get("email"),
     role: formData.get("role"),
+    title: formData.get("title"),
     entityId: formData.get("entityId"),
   });
 
@@ -34,6 +35,7 @@ export async function inviteUserAction(formData: FormData) {
   const {
     name,
     role,
+    title,
     entityId,
   } = parsedInput.data;
   const email = parsedInput.data.email.toLowerCase();
@@ -66,7 +68,7 @@ export async function inviteUserAction(formData: FormData) {
       name,
       email,
       role,
-      title: role === "admin" ? "Admin" : null,
+      title: role === "admin" ? "Admin" : title ?? null,
       entity_id: entityId,
       active: true,
     },
@@ -86,6 +88,7 @@ export async function updateUserAction(formData: FormData) {
     userId: formData.get("userId"),
     name: formData.get("name"),
     role: formData.get("role"),
+    title: formData.get("title"),
     entityId: formData.get("entityId"),
   });
 
@@ -94,14 +97,20 @@ export async function updateUserAction(formData: FormData) {
   }
 
   const adminClient = createAdminClient();
-  const { userId, name, role, entityId } = parsedInput.data;
+  const { userId, name, role, title, entityId } = parsedInput.data;
+  const titleForRole =
+    role === "admin"
+      ? "Admin"
+      : formData.has("title")
+        ? title ?? null
+        : await getExistingUserTitle(adminClient, userId);
   const { error } = await adminClient
     .from("users")
     .update({
       name,
       role,
       entity_id: entityId,
-      title: role === "admin" ? "Admin" : null,
+      title: titleForRole,
     })
     .eq("id", userId);
 
@@ -326,6 +335,23 @@ async function findAuthUserByEmail(
 
     page += 1;
   }
+}
+
+async function getExistingUserTitle(
+  adminClient: ReturnType<typeof createAdminClient>,
+  userId: string,
+) {
+  const { data, error } = await adminClient
+    .from("users")
+    .select("title")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data?.title ?? null;
 }
 
 function normalizeNullableString(value: FormDataEntryValue | null) {

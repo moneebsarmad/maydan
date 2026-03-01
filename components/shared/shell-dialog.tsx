@@ -1,4 +1,12 @@
-import { X } from "lucide-react";
+"use client";
+
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface ShellDialogProps {
   open: boolean;
@@ -15,33 +23,17 @@ export function ShellDialog({
   onClose,
   children,
 }: ShellDialogProps) {
-  if (!open) {
-    return null;
-  }
-
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/45 px-4 py-4 backdrop-blur-sm md:items-center">
-      <div className="max-h-[calc(100vh-2rem)] w-full max-w-lg overflow-y-auto rounded-[2rem] border border-stone-200 bg-white p-6 shadow-2xl">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h3 className="text-2xl font-semibold text-slate-950">{title}</h3>
-            {description ? (
-              <p className="mt-2 text-sm leading-6 text-stone-600">
-                {description}
-              </p>
-            ) : null}
-          </div>
-          <button
-            aria-label="Close dialog"
-            className="rounded-full border border-stone-200 p-2 text-stone-500 transition hover:bg-stone-50"
-            onClick={onClose}
-            type="button"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="mt-6">{children}</div>
-      </div>
-    </div>
+    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          {description ? (
+            <DialogDescription>{description}</DialogDescription>
+          ) : null}
+        </DialogHeader>
+        <div className="mt-2">{children}</div>
+      </DialogContent>
+    </Dialog>
   );
 }

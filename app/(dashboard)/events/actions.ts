@@ -18,6 +18,10 @@ import {
   getMarketingRequestNotifications,
 } from "@/lib/notification-payloads";
 import { createClient } from "@/lib/supabase/server";
+import {
+  runNonCriticalEffect,
+  settleNonCriticalEffects,
+} from "@/lib/utils/non-critical";
 import { eventFormSchema, type EventFormValues } from "@/lib/utils/event-form";
 import type { EntityType, GradeLevel } from "@/types";
 
@@ -108,41 +112,45 @@ export async function submitEvent(
       throw new Error(stepsError.message);
     }
 
-    for (const notification of getEventSubmittedNotifications({
-      eventId,
-      eventName: parsedValues.data.name,
-      firstApproverId: approvalChain.approverIds[0],
-      facilitiesDirectorId: approvalChain.ccUserId,
-    })) {
-      await createNotification(
-        notification.userId,
-        notification.eventId,
-        notification.message,
+    await runNonCriticalEffect(`submit event notifications:${eventId}`, async () => {
+      await settleNonCriticalEffects(
+        `submit event in-app notifications:${eventId}`,
+        getEventSubmittedNotifications({
+          eventId,
+          eventName: parsedValues.data.name,
+          firstApproverId: approvalChain.approverIds[0],
+          facilitiesDirectorId: approvalChain.ccUserId,
+        }).map((notification) =>
+          createNotification(
+            notification.userId,
+            notification.eventId,
+            notification.message,
+          ),
+        ),
       );
-    }
 
-    const recipients = await getNotificationRecipients(querySupabase, [
-      approvalChain.approverIds[0],
-      approvalChain.ccUserId,
-    ]);
+      const recipients = await getNotificationRecipients(querySupabase, [
+        approvalChain.approverIds[0],
+        approvalChain.ccUserId,
+      ]);
 
-    // In-app notifications are the primary Phase 4 delivery path.
-    await Promise.allSettled([
-      recipients.stepOneRecipient?.email
-        ? sendApprovalRequestEmail(
-            recipients.stepOneRecipient.email,
-            parsedValues.data.name,
-            eventId,
-          )
-        : Promise.resolve(null),
-      recipients.facilitiesRecipient?.email
-        ? sendFacilitiesCcEmail(
-            recipients.facilitiesRecipient.email,
-            parsedValues.data.name,
-            eventId,
-          )
-        : Promise.resolve(null),
-    ]);
+      await settleNonCriticalEffects(`submit event emails:${eventId}`, [
+        recipients.stepOneRecipient?.email
+          ? sendApprovalRequestEmail(
+              recipients.stepOneRecipient.email,
+              parsedValues.data.name,
+              eventId,
+            )
+          : Promise.resolve(null),
+        recipients.facilitiesRecipient?.email
+          ? sendFacilitiesCcEmail(
+              recipients.facilitiesRecipient.email,
+              parsedValues.data.name,
+              eventId,
+            )
+          : Promise.resolve(null),
+      ]);
+    });
 
     if (parsedValues.data.marketingNeeded) {
       const { error: marketingError } = await supabase
@@ -160,29 +168,38 @@ export async function submitEvent(
         throw new Error(marketingError.message);
       }
 
-      const prStaffRecipients = await getPRStaffRecipients(querySupabase);
+      await runNonCriticalEffect(
+        `submit event marketing side effects:${eventId}`,
+        async () => {
+          const prStaffRecipients = await getPRStaffRecipients(querySupabase);
 
-      for (const notification of getMarketingRequestNotifications({
-        eventId,
-        eventName: parsedValues.data.name,
-        prStaffIds: prStaffRecipients.map((recipient) => recipient.id),
-      })) {
-        await createNotification(
-          notification.userId,
-          notification.eventId,
-          notification.message,
-        );
-      }
+          await settleNonCriticalEffects(
+            `submit event marketing notifications:${eventId}`,
+            getMarketingRequestNotifications({
+              eventId,
+              eventName: parsedValues.data.name,
+              prStaffIds: prStaffRecipients.map((recipient) => recipient.id),
+            }).map((notification) =>
+              createNotification(
+                notification.userId,
+                notification.eventId,
+                notification.message,
+              ),
+            ),
+          );
 
-      await Promise.allSettled(
-        prStaffRecipients.map((recipient) =>
-          sendMarketingRequestEmail(
-            recipient.email,
-            parsedValues.data.name,
-            parsedValues.data.marketingDetails ?? "",
-            eventId,
-          ),
-        ),
+          await settleNonCriticalEffects(
+            `submit event marketing emails:${eventId}`,
+            prStaffRecipients.map((recipient) =>
+              sendMarketingRequestEmail(
+                recipient.email,
+                parsedValues.data.name,
+                parsedValues.data.marketingDetails ?? "",
+                eventId,
+              ),
+            ),
+          );
+        },
       );
     }
 

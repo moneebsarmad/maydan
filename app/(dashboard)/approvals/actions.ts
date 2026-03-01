@@ -19,6 +19,10 @@ import {
   getResubmissionNotifications,
 } from "@/lib/notification-payloads";
 import { createClient } from "@/lib/supabase/server";
+import {
+  runNonCriticalEffect,
+  settleNonCriticalEffects,
+} from "@/lib/utils/non-critical";
 
 const eventActionSchema = z.object({
   eventId: z.string().uuid("Event not found."),
@@ -112,30 +116,39 @@ export async function approveStep(input: {
         throw new Error(eventError.message);
       }
 
-      for (const notification of getIntermediateApprovalNotifications({
-        eventId: parsedInput.data.eventId,
-        eventName: event.name,
-        nextApproverId: nextStep.approverId,
-      })) {
-        await createNotification(
-          notification.userId,
-          notification.eventId,
-          notification.message,
-        );
-      }
-
-      const nextApprover = await getUserContact(supabase, nextStep.approverId);
-
-      await Promise.allSettled(
-        nextApprover?.email
-          ? [
-              sendApprovalRequestEmail(
-                nextApprover.email,
-                event.name,
-                parsedInput.data.eventId,
+      await runNonCriticalEffect(
+        `approve step intermediate notifications:${parsedInput.data.eventId}`,
+        async () => {
+          await settleNonCriticalEffects(
+            `approve step in-app notifications:${parsedInput.data.eventId}`,
+            getIntermediateApprovalNotifications({
+              eventId: parsedInput.data.eventId,
+              eventName: event.name,
+              nextApproverId: nextStep.approverId,
+            }).map((notification) =>
+              createNotification(
+                notification.userId,
+                notification.eventId,
+                notification.message,
               ),
-            ]
-          : [],
+            ),
+          );
+
+          const nextApprover = await getUserContact(supabase, nextStep.approverId);
+
+          await settleNonCriticalEffects(
+            `approve step email notifications:${parsedInput.data.eventId}`,
+            nextApprover?.email
+              ? [
+                  sendApprovalRequestEmail(
+                    nextApprover.email,
+                    event.name,
+                    parsedInput.data.eventId,
+                  ),
+                ]
+              : [],
+          );
+        },
       );
 
       revalidateWorkflowPaths(parsedInput.data.eventId);
@@ -158,24 +171,33 @@ export async function approveStep(input: {
       throw new Error(eventError.message);
     }
 
-    for (const notification of getFinalApprovalNotifications({
-      eventId: parsedInput.data.eventId,
-      eventName: event.name,
-      submitterId: event.submitterId,
-    })) {
-      await createNotification(
-        notification.userId,
-        notification.eventId,
-        notification.message,
-      );
-    }
+    await runNonCriticalEffect(
+      `final approval notifications:${parsedInput.data.eventId}`,
+      async () => {
+        await settleNonCriticalEffects(
+          `final approval in-app notifications:${parsedInput.data.eventId}`,
+          getFinalApprovalNotifications({
+            eventId: parsedInput.data.eventId,
+            eventName: event.name,
+            submitterId: event.submitterId,
+          }).map((notification) =>
+            createNotification(
+              notification.userId,
+              notification.eventId,
+              notification.message,
+            ),
+          ),
+        );
 
-    const submitter = await getUserContact(supabase, event.submitterId);
+        const submitter = await getUserContact(supabase, event.submitterId);
 
-    await Promise.allSettled(
-      submitter?.email
-        ? [sendEventApprovedEmail(submitter.email, event.name)]
-        : [],
+        await settleNonCriticalEffects(
+          `final approval email notifications:${parsedInput.data.eventId}`,
+          submitter?.email
+            ? [sendEventApprovedEmail(submitter.email, event.name)]
+            : [],
+        );
+      },
     );
 
     revalidateWorkflowPaths(parsedInput.data.eventId);
@@ -250,31 +272,40 @@ export async function rejectStep(input: {
       throw new Error(eventError.message);
     }
 
-    for (const notification of getRejectionNotifications({
-      eventId: parsedInput.data.eventId,
-      eventName: event.name,
-      submitterId: event.submitterId,
-      reason: parsedInput.data.reason,
-    })) {
-      await createNotification(
-        notification.userId,
-        notification.eventId,
-        notification.message,
-      );
-    }
-
-    const submitter = await getUserContact(supabase, event.submitterId);
-
-    await Promise.allSettled(
-      submitter?.email
-        ? [
-            sendEventRejectedEmail(
-              submitter.email,
-              event.name,
-              parsedInput.data.reason,
+    await runNonCriticalEffect(
+      `reject step notifications:${parsedInput.data.eventId}`,
+      async () => {
+        await settleNonCriticalEffects(
+          `reject step in-app notifications:${parsedInput.data.eventId}`,
+          getRejectionNotifications({
+            eventId: parsedInput.data.eventId,
+            eventName: event.name,
+            submitterId: event.submitterId,
+            reason: parsedInput.data.reason,
+          }).map((notification) =>
+            createNotification(
+              notification.userId,
+              notification.eventId,
+              notification.message,
             ),
-          ]
-        : [],
+          ),
+        );
+
+        const submitter = await getUserContact(supabase, event.submitterId);
+
+        await settleNonCriticalEffects(
+          `reject step email notifications:${parsedInput.data.eventId}`,
+          submitter?.email
+            ? [
+                sendEventRejectedEmail(
+                  submitter.email,
+                  event.name,
+                  parsedInput.data.reason,
+                ),
+              ]
+            : [],
+        );
+      },
     );
 
     revalidateWorkflowPaths(parsedInput.data.eventId);
@@ -350,33 +381,42 @@ export async function suggestAlternative(input: {
       throw new Error(eventError.message);
     }
 
-    for (const notification of getAlternativeNotifications({
-      eventId: parsedInput.data.eventId,
-      eventName: event.name,
-      submitterId: event.submitterId,
-      suggestedDate: parsedInput.data.suggestedDate,
-      suggestedTime: parsedInput.data.suggestedTime,
-    })) {
-      await createNotification(
-        notification.userId,
-        notification.eventId,
-        notification.message,
-      );
-    }
-
-    const submitter = await getUserContact(supabase, event.submitterId);
-
-    await Promise.allSettled(
-      submitter?.email
-        ? [
-            sendAlternativeSuggestedEmail(
-              submitter.email,
-              event.name,
-              parsedInput.data.suggestedDate,
-              parsedInput.data.suggestedTime,
+    await runNonCriticalEffect(
+      `suggest alternative notifications:${parsedInput.data.eventId}`,
+      async () => {
+        await settleNonCriticalEffects(
+          `suggest alternative in-app notifications:${parsedInput.data.eventId}`,
+          getAlternativeNotifications({
+            eventId: parsedInput.data.eventId,
+            eventName: event.name,
+            submitterId: event.submitterId,
+            suggestedDate: parsedInput.data.suggestedDate,
+            suggestedTime: parsedInput.data.suggestedTime,
+          }).map((notification) =>
+            createNotification(
+              notification.userId,
+              notification.eventId,
+              notification.message,
             ),
-          ]
-        : [],
+          ),
+        );
+
+        const submitter = await getUserContact(supabase, event.submitterId);
+
+        await settleNonCriticalEffects(
+          `suggest alternative email notifications:${parsedInput.data.eventId}`,
+          submitter?.email
+            ? [
+                sendAlternativeSuggestedEmail(
+                  submitter.email,
+                  event.name,
+                  parsedInput.data.suggestedDate,
+                  parsedInput.data.suggestedTime,
+                ),
+              ]
+            : [],
+        );
+      },
     );
 
     revalidateWorkflowPaths(parsedInput.data.eventId);
@@ -456,44 +496,56 @@ export async function resubmitEvent(input: {
       throw new Error(eventError.message);
     }
 
-    const facilitiesRecipient = await getFacilitiesRecipient(supabase);
-    for (const notification of getResubmissionNotifications({
-      eventId: parsedInput.data.eventId,
-      eventName: event.name,
-      firstApproverId: firstStep.approverId,
-      facilitiesDirectorId: facilitiesRecipient?.id,
-    })) {
-      await createNotification(
-        notification.userId,
-        notification.eventId,
-        notification.message,
-      );
-    }
+    await runNonCriticalEffect(
+      `resubmit event notifications:${parsedInput.data.eventId}`,
+      async () => {
+        const facilitiesRecipient = await getFacilitiesRecipient(supabase);
 
-    const [firstApprover] = await Promise.all([
-      getUserContact(supabase, firstStep.approverId),
-    ]);
+        await settleNonCriticalEffects(
+          `resubmit event in-app notifications:${parsedInput.data.eventId}`,
+          getResubmissionNotifications({
+            eventId: parsedInput.data.eventId,
+            eventName: event.name,
+            firstApproverId: firstStep.approverId,
+            facilitiesDirectorId: facilitiesRecipient?.id,
+          }).map((notification) =>
+            createNotification(
+              notification.userId,
+              notification.eventId,
+              notification.message,
+            ),
+          ),
+        );
 
-    await Promise.allSettled([
-      ...(firstApprover?.email
-        ? [
-            sendApprovalRequestEmail(
-              firstApprover.email,
-              event.name,
-              parsedInput.data.eventId,
-            ),
-          ]
-        : []),
-      ...(facilitiesRecipient?.email
-        ? [
-            sendFacilitiesNotificationEmail(
-              facilitiesRecipient.email,
-              event.name,
-              parsedInput.data.eventId,
-            ),
-          ]
-        : []),
-    ]);
+        const [firstApprover] = await Promise.all([
+          getUserContact(supabase, firstStep.approverId),
+        ]);
+
+        await settleNonCriticalEffects(
+          `resubmit event email notifications:${parsedInput.data.eventId}`,
+          [
+            ...(firstApprover?.email
+              ? [
+                  sendApprovalRequestEmail(
+                    firstApprover.email,
+                    event.name,
+                    parsedInput.data.eventId,
+                  ),
+                ]
+              : []),
+            ...(facilitiesRecipient?.email
+              ? [
+                  sendFacilitiesNotificationEmail(
+                    facilitiesRecipient.email,
+                    event.name,
+                    parsedInput.data.eventId,
+                  ),
+                ]
+              : []),
+          ],
+        );
+      },
+    );
 
     revalidateWorkflowPaths(parsedInput.data.eventId);
 
@@ -584,33 +636,40 @@ export async function flagFacilityConflict(input: {
       (userId, index, recipients) => recipients.indexOf(userId) === index,
     );
 
-    await Promise.all(
-      recipientIds.map((userId) =>
-        createNotification(
-          userId,
-          parsedInput.data.eventId,
-          `Facilities flagged a conflict on "${event.name}": ${parsedInput.data.notes}`,
-        ),
-      ),
-    );
+    await runNonCriticalEffect(
+      `facility conflict notifications:${parsedInput.data.eventId}`,
+      async () => {
+        await settleNonCriticalEffects(
+          `facility conflict in-app notifications:${parsedInput.data.eventId}`,
+          recipientIds.map((userId) =>
+            createNotification(
+              userId,
+              parsedInput.data.eventId,
+              `Facilities flagged a conflict on "${event.name}": ${parsedInput.data.notes}`,
+            ),
+          ),
+        );
 
-    const recipients = await Promise.all(
-      recipientIds.map((userId) => getUserContact(supabase, userId)),
-    );
+        const recipients = await Promise.all(
+          recipientIds.map((userId) => getUserContact(supabase, userId)),
+        );
 
-    await Promise.allSettled(
-      recipients.flatMap((recipient) =>
-        recipient?.email
-          ? [
-              sendFacilityConflictFlaggedEmail(
-                recipient.email,
-                event.name,
-                parsedInput.data.notes,
-                parsedInput.data.eventId,
-              ),
-            ]
-          : [],
-      ),
+        await settleNonCriticalEffects(
+          `facility conflict email notifications:${parsedInput.data.eventId}`,
+          recipients.flatMap((recipient) =>
+            recipient?.email
+              ? [
+                  sendFacilityConflictFlaggedEmail(
+                    recipient.email,
+                    event.name,
+                    parsedInput.data.notes,
+                    parsedInput.data.eventId,
+                  ),
+                ]
+              : [],
+          ),
+        );
+      },
     );
 
     revalidateWorkflowPaths(parsedInput.data.eventId);
