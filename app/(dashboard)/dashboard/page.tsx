@@ -154,6 +154,7 @@ export default async function DashboardPage() {
   const actionableApprovals = toActionableApprovalItems(
     (pendingApprovalStepsResponse.data ?? []) as DashboardApprovalStepRow[],
   );
+  const heroCopy = buildDashboardHeroCopy(user.role);
   const summaryCards = buildSummaryCards({
     role: user.role,
     pendingEventsCount,
@@ -172,11 +173,10 @@ export default async function DashboardPage() {
         <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h1 className="text-4xl font-semibold tracking-tight">
-              Keep every event moving through the right chain.
+              {heroCopy.title}
             </h1>
             <p className="mt-3 max-w-2xl text-base leading-7 text-slate-300">
-              Live counts, recent workflow changes, and role-aware queue
-              visibility are now pulled directly from Supabase.
+              {heroCopy.description}
             </p>
           </div>
           <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm text-slate-100">
@@ -480,6 +480,39 @@ function buildSummaryCards(input: {
       detail: "Approved events dated within the current month and visible to you.",
     },
   ];
+}
+
+function buildDashboardHeroCopy(role: ShellRole) {
+  switch (role) {
+    case "staff":
+      return {
+        title: "Track your event requests from submission to approval.",
+        description:
+          "Review your current requests, recent status changes, and upcoming approved events in one place.",
+      };
+    case "approver":
+      return {
+        title: "Review requests waiting on your decision.",
+        description:
+          "See what needs approval now, follow recent workflow movement, and keep the queue moving.",
+      };
+    case "viewer":
+      return {
+        title: "Stay current on approved events and workflow updates.",
+        description:
+          "Use this dashboard to review visible activity, upcoming approved events, and the latest school-wide scheduling changes.",
+      };
+    case "admin":
+      return {
+        title: "Monitor submissions, approvals, and school-wide event flow.",
+        description:
+          "Use the dashboard to watch pending volume, recent workflow activity, and the current approval queue across Maydan.",
+      };
+    default: {
+      const exhaustiveCheck: never = role;
+      return exhaustiveCheck;
+    }
+  }
 }
 
 function buildActivityItem(event: DashboardEventRow): ActivityItem {
