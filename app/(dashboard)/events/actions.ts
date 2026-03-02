@@ -9,6 +9,7 @@ import {
   createSupabaseApprovalRoutingRepository,
   type SupabaseLike,
 } from "@/lib/routing/approval-router";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   sendApprovalRequestEmail,
   sendFacilitiesCcEmail,
@@ -327,6 +328,200 @@ export async function saveDraft(
   }
 }
 
+export async function updateExistingEvent(input: {
+  eventId: string;
+  values: EventFormValues;
+  submit: boolean;
+}): Promise<EventActionResult> {
+  const parsedValues = eventFormSchema.safeParse(input.values);
+
+  if (!parsedValues.success) {
+    return {
+      success: false,
+      error: parsedValues.error.issues[0]?.message ?? "Event data is invalid.",
+    };
+  }
+
+  const supabase = createClient();
+  const querySupabase = supabase as any;
+  const profile = await getActiveProfileWithEntity(supabase);
+
+  try {
+    const editableEvent = await getEditableEvent(supabase, input.eventId, profile.id);
+    const entity = await getEntityForSubmission(querySupabase, profile.entityId);
+    const facility = await getFacilityForSubmission(
+      querySupabase,
+      parsedValues.data.facilityId,
+    );
+    validateFacilityNotes(facility.name, parsedValues.data.facilityNotes);
+
+    const nextStatus =
+      editableEvent.status === "draft" && input.submit ? "pending" : editableEvent.status;
+
+    const { error: eventError } = await supabase
+      .from("events")
+      .update({
+        name: parsedValues.data.name,
+        date: parsedValues.data.date,
+        start_time: parsedValues.data.startTime,
+        end_time: parsedValues.data.endTime,
+        facility_id: parsedValues.data.facilityId,
+        facility_notes: parsedValues.data.facilityNotes ?? null,
+        description: parsedValues.data.description,
+        audience: parsedValues.data.audience,
+        grade_level: parsedValues.data.gradeLevel,
+        expected_attendance: parsedValues.data.expectedAttendance ?? null,
+        staffing_needs: parsedValues.data.staffingNeeds ?? null,
+        marketing_needed: parsedValues.data.marketingNeeded,
+        entity_id: entity.id,
+        status: nextStatus,
+        current_step:
+          editableEvent.status === "draft" && input.submit
+            ? 1
+            : editableEvent.currentStep,
+      })
+      .eq("id", input.eventId);
+
+    if (eventError) {
+      throw new Error(eventError.message);
+    }
+
+    const marketingRequest = await syncMarketingRequestForEvent({
+      supabase,
+      eventId: input.eventId,
+      values: parsedValues.data,
+      existingMarketingRequestId: editableEvent.marketingRequestId,
+      existingMarketingFileUrl: editableEvent.marketingRequestFileUrl,
+    });
+
+    if (editableEvent.status === "draft" && input.submit) {
+      const routingDependencies = createApprovalRoutingDependencies(
+        createSupabaseApprovalRoutingRepository(querySupabase as SupabaseLike),
+      );
+      const approvalChain = await buildApprovalChain(
+        entity.type,
+        entity.id,
+        parsedValues.data.gradeLevel,
+        routingDependencies,
+      );
+
+      await supabase.from("approval_steps").delete().eq("event_id", input.eventId);
+
+      const approvalStepRows = approvalChain.approverIds.map((approverId, index) => ({
+        event_id: input.eventId,
+        approver_id: approverId,
+        step_number: index + 1,
+        status: "pending" as const,
+      }));
+
+      const { error: stepsError } = await supabase
+        .from("approval_steps")
+        .insert(approvalStepRows);
+
+      if (stepsError) {
+        throw new Error(stepsError.message);
+      }
+
+      await runNonCriticalEffect(
+        `submit existing draft notifications:${input.eventId}`,
+        async () => {
+          await settleNonCriticalEffects(
+            `submit existing draft in-app notifications:${input.eventId}`,
+            getEventSubmittedNotifications({
+              eventId: input.eventId,
+              eventName: parsedValues.data.name,
+              firstApproverId: approvalChain.approverIds[0],
+              facilitiesDirectorId: approvalChain.ccUserId,
+            }).map((notification) =>
+              createNotification(
+                notification.userId,
+                notification.eventId,
+                notification.message,
+              ),
+            ),
+          );
+
+          const recipients = await getNotificationRecipients(querySupabase, [
+            approvalChain.approverIds[0],
+            approvalChain.ccUserId,
+          ]);
+
+          await settleNonCriticalEffects(
+            `submit existing draft emails:${input.eventId}`,
+            [
+              recipients.stepOneRecipient?.email
+                ? sendApprovalRequestEmail(
+                    recipients.stepOneRecipient.email,
+                    parsedValues.data.name,
+                    input.eventId,
+                  )
+                : Promise.resolve(null),
+              recipients.facilitiesRecipient?.email
+                ? sendFacilitiesCcEmail(
+                    recipients.facilitiesRecipient.email,
+                    parsedValues.data.name,
+                    input.eventId,
+                  )
+                : Promise.resolve(null),
+            ],
+          );
+        },
+      );
+
+      if (parsedValues.data.marketingNeeded && marketingRequest) {
+        await runNonCriticalEffect(
+          `submit existing draft marketing side effects:${input.eventId}`,
+          async () => {
+            const prStaffRecipients = await getPRStaffRecipients(querySupabase);
+
+            await settleNonCriticalEffects(
+              `submit existing draft marketing notifications:${input.eventId}`,
+              getMarketingRequestNotifications({
+                eventId: input.eventId,
+                eventName: parsedValues.data.name,
+                prStaffIds: prStaffRecipients.map((recipient) => recipient.id),
+              }).map((notification) =>
+                createNotification(
+                  notification.userId,
+                  notification.eventId,
+                  notification.message,
+                ),
+              ),
+            );
+
+            await settleNonCriticalEffects(
+              `submit existing draft marketing emails:${input.eventId}`,
+              prStaffRecipients.map((recipient) =>
+                sendMarketingRequestEmail(
+                  recipient.email,
+                  parsedValues.data.name,
+                  parsedValues.data.marketingDetails ?? "",
+                  input.eventId,
+                ),
+              ),
+            );
+          },
+        );
+      }
+    }
+
+    revalidatePhaseFourPaths(input.eventId);
+
+    return {
+      success: true,
+      eventId: input.eventId,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Unable to update the event right now.",
+    };
+  }
+}
+
 export async function addMarketingRequestComment(input: {
   eventId: string;
   marketingRequestId: string;
@@ -504,6 +699,48 @@ async function getActiveMarketingCommentActor(
   };
 }
 
+async function getEditableEvent(
+  supabase: ReturnType<typeof createClient>,
+  eventId: string,
+  submitterId: string,
+) {
+  const { data: event, error } = await supabase
+    .from("events")
+    .select("id, status, current_step, submitter_id")
+    .eq("id", eventId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!event || event.submitter_id !== submitterId) {
+    throw new Error("You can only edit your own event.");
+  }
+
+  if (event.status !== "draft" && event.status !== "needs_revision") {
+    throw new Error("Only draft or needs revision events can be edited.");
+  }
+
+  const { data: marketingRequest, error: marketingError } = await supabase
+    .from("marketing_requests")
+    .select("id, file_url")
+    .eq("event_id", eventId)
+    .maybeSingle();
+
+  if (marketingError) {
+    throw new Error(marketingError.message);
+  }
+
+  return {
+    id: event.id,
+    status: event.status,
+    currentStep: event.current_step ?? 1,
+    marketingRequestId: marketingRequest?.id ?? null,
+    marketingRequestFileUrl: marketingRequest?.file_url ?? null,
+  };
+}
+
 async function getEntityForSubmission(supabase: any, entityId: string) {
   const { data: entity, error } = await supabase
     .from("entities")
@@ -601,6 +838,89 @@ async function getPRStaffRecipients(supabase: any) {
     id: string;
     email: string;
   }>;
+}
+
+async function syncMarketingRequestForEvent(input: {
+  supabase: ReturnType<typeof createClient>;
+  eventId: string;
+  values: EventFormValues;
+  existingMarketingRequestId: string | null;
+  existingMarketingFileUrl: string | null;
+}) {
+  if (!input.values.marketingNeeded) {
+    if (!input.existingMarketingRequestId) {
+      return null;
+    }
+
+    const { error } = await input.supabase
+      .from("marketing_requests")
+      .delete()
+      .eq("id", input.existingMarketingRequestId);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    if (input.existingMarketingFileUrl) {
+      const existingFileUrl = input.existingMarketingFileUrl;
+
+      await runNonCriticalEffect(
+        `remove marketing upload:${input.eventId}`,
+        async () => {
+          const admin = createAdminClient();
+          const { error: storageError } = await admin.storage
+            .from("marketing-uploads")
+            .remove([existingFileUrl]);
+
+          if (storageError) {
+            throw new Error(storageError.message);
+          }
+        },
+      );
+    }
+
+    return null;
+  }
+
+  const payload = {
+    event_id: input.eventId,
+    type: input.values.marketingType!,
+    details: input.values.marketingDetails ?? null,
+    target_audience: input.values.marketingAudience ?? null,
+    priority: input.values.marketingPriority ?? "standard",
+    file_url: input.existingMarketingFileUrl ?? null,
+  };
+
+  if (input.existingMarketingRequestId) {
+    const { error } = await input.supabase
+      .from("marketing_requests")
+      .update(payload)
+      .eq("id", input.existingMarketingRequestId);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return {
+      id: input.existingMarketingRequestId,
+      fileUrl: input.existingMarketingFileUrl,
+    };
+  }
+
+  const { data, error } = await input.supabase
+    .from("marketing_requests")
+    .insert(payload)
+    .select("id, file_url")
+    .single();
+
+  if (error || !data) {
+    throw new Error(error?.message ?? "Unable to save the marketing request.");
+  }
+
+  return {
+    id: data.id,
+    fileUrl: data.file_url ?? null,
+  };
 }
 
 async function getEventForMarketingCommentNotification(

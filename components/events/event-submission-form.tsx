@@ -4,7 +4,11 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { saveDraft, submitEvent } from "@/app/(dashboard)/events/actions";
+import {
+  saveDraft,
+  submitEvent,
+  updateExistingEvent,
+} from "@/app/(dashboard)/events/actions";
 import { LoadingLabel } from "@/components/shared/loading-label";
 import { AppToast } from "@/components/shared/toast";
 import { Button } from "@/components/ui/button";
@@ -19,6 +23,7 @@ import {
   marketingTypes,
   type EventFormValues,
 } from "@/lib/utils/event-form";
+import type { EventStatus } from "@/types";
 
 interface EventSubmissionFormProps {
   entityName: string;
@@ -26,6 +31,11 @@ interface EventSubmissionFormProps {
     id: string;
     name: string;
   }>;
+  mode?: "create" | "edit";
+  eventId?: string;
+  eventStatus?: EventStatus;
+  initialValues?: Partial<EventFormValues>;
+  existingMarketingFileUrl?: string | null;
 }
 
 interface ToastState {
@@ -37,9 +47,15 @@ interface ToastState {
 export function EventSubmissionForm({
   entityName,
   facilities,
+  mode = "create",
+  eventId,
+  eventStatus = "draft",
+  initialValues,
+  existingMarketingFileUrl = null,
 }: EventSubmissionFormProps) {
   const router = useRouter();
   const supabase = createBrowserClient();
+  const isEditMode = mode === "edit";
   const [isPending, startTransition] = useTransition();
   const [pendingAction, setPendingAction] = useState<"submit" | "draft" | null>(
     null,
@@ -60,6 +76,7 @@ export function EventSubmissionForm({
       marketingNeeded: false,
       marketingPriority: "standard",
       gradeLevel: "HS",
+      ...initialValues,
     },
   });
 
@@ -68,6 +85,12 @@ export function EventSubmissionForm({
   const selectedAudience = watch("audience") ?? [];
   const classroomFacilityId =
     facilities.find((facility) => facility.name === "Classroom")?.id ?? null;
+  const canSaveDraft = !isEditMode || eventStatus === "draft";
+  const primaryActionLabel = !isEditMode
+    ? "Submit event"
+    : eventStatus === "draft"
+      ? "Submit event"
+      : "Save changes";
 
   const runAction = (
     action: "submit" | "draft",
@@ -77,20 +100,38 @@ export function EventSubmissionForm({
     setToast(null);
 
     startTransition(async () => {
-      const result =
-        action === "submit" ? await submitEvent(values) : await saveDraft(values);
+      const result = isEditMode
+        ? await updateExistingEvent({
+            eventId: eventId!,
+            values,
+            submit: action === "submit" && eventStatus === "draft",
+          })
+        : action === "submit"
+          ? await submitEvent(values)
+          : await saveDraft(values);
 
       if (!result.success) {
         setToast({
           variant: "error",
-          title: action === "submit" ? "Submission failed" : "Draft save failed",
+          title:
+            action === "submit"
+              ? isEditMode
+                ? "Update failed"
+                : "Submission failed"
+              : "Draft save failed",
           description: result.error,
         });
         setPendingAction(null);
         return;
       }
 
-      let destination = `/events/${result.eventId}`;
+      const destinationParams = new URLSearchParams();
+      if (isEditMode) {
+        destinationParams.set(
+          "updated",
+          eventStatus === "draft" && action === "submit" ? "submitted" : "saved",
+        );
+      }
 
       if (values.marketingNeeded && marketingFile) {
         try {
@@ -98,17 +139,33 @@ export function EventSubmissionForm({
             supabase,
             eventId: result.eventId,
             file: marketingFile,
+            existingFileUrl: existingMarketingFileUrl,
           });
         } catch {
-          destination = `/events/${result.eventId}?upload=failed`;
+          destinationParams.set("upload", "failed");
         }
       }
 
+      const destinationQuery = destinationParams.toString();
+      const destination = destinationQuery
+        ? `/events/${result.eventId}?${destinationQuery}`
+        : `/events/${result.eventId}`;
+
       setToast({
         variant: "success",
-        title: action === "submit" ? "Event submitted" : "Draft saved",
+        title: isEditMode
+          ? eventStatus === "draft" && action === "submit"
+            ? "Event submitted"
+            : "Changes saved"
+          : action === "submit"
+            ? "Event submitted"
+            : "Draft saved",
         description:
-          action === "submit"
+          isEditMode
+            ? eventStatus === "draft" && action === "submit"
+              ? "The draft was submitted and routed to the first approver."
+              : "Your event changes were saved successfully."
+            : action === "submit"
             ? "The event was routed to the first approver successfully."
             : "The event was saved as a draft without entering the approval chain.",
       });
@@ -365,29 +422,44 @@ export function EventSubmissionForm({
                     setMarketingFile(event.target.files?.[0] ?? null)
                   }
                 />
+                {existingMarketingFileUrl ? (
+                  <p className="text-xs text-stone-500">
+                    Current attachment: {existingMarketingFileUrl}
+                  </p>
+                ) : null}
               </div>
             </div>
           </div>
         ) : null}
 
         <div className="flex flex-wrap justify-end gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            disabled={isPending}
-            onClick={handleSubmit((values) => runAction("draft", values))}
-          >
-            {pendingAction === "draft" ? (
-              <LoadingLabel label="Saving draft..." />
-            ) : (
-              "Save draft"
-            )}
-          </Button>
+          {canSaveDraft ? (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isPending}
+              onClick={handleSubmit((values) => runAction("draft", values))}
+            >
+              {pendingAction === "draft" ? (
+                <LoadingLabel
+                  label={isEditMode ? "Saving draft..." : "Saving draft..."}
+                />
+              ) : (
+                "Save draft"
+              )}
+            </Button>
+          ) : null}
           <Button type="submit" disabled={isPending}>
             {pendingAction === "submit" ? (
-              <LoadingLabel label="Submitting..." />
+              <LoadingLabel
+                label={
+                  isEditMode && eventStatus !== "draft"
+                    ? "Saving changes..."
+                    : "Submitting..."
+                }
+              />
             ) : (
-              "Submit event"
+              primaryActionLabel
             )}
           </Button>
         </div>
@@ -408,17 +480,19 @@ async function uploadMarketingFile({
   supabase,
   eventId,
   file,
+  existingFileUrl,
 }: {
   supabase: ReturnType<typeof createBrowserClient>;
   eventId: string;
   file: File;
+  existingFileUrl?: string | null;
 }) {
   const sanitizedFileName = file.name.replaceAll(/\s+/g, "-");
-  const filePath = `${eventId}/${sanitizedFileName}`;
+  const filePath = existingFileUrl ?? `${eventId}/${sanitizedFileName}`;
 
   const { error: uploadError } = await supabase.storage
     .from("marketing-uploads")
-    .upload(filePath, file);
+    .upload(filePath, file, { upsert: true });
 
   if (uploadError) {
     throw new Error(uploadError.message);

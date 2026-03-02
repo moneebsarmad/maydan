@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ApprovalChainProgress } from "@/components/approvals/approval-chain-progress";
 import { FacilityConflictCard } from "@/components/events/facility-conflict-card";
@@ -16,6 +17,7 @@ interface EventDetailPageProps {
   };
   searchParams?: {
     upload?: string;
+    updated?: string;
   };
 }
 
@@ -118,6 +120,9 @@ export default async function EventDetailPage({
   );
   const canResubmit =
     event.status === "needs_revision" && event.submitter_id === user.id;
+  const canEditEvent =
+    event.submitter_id === user.id &&
+    (event.status === "draft" || event.status === "needs_revision");
   const canFlagFacilityConflict =
     event.status === "pending" &&
     (user.role === "admin" || user.title === "Facilities Director");
@@ -142,7 +147,21 @@ export default async function EventDetailPage({
         <AppToast
           variant="error"
           title="Attachment upload failed"
-          description="The event was saved successfully, but the marketing file upload did not complete. You can continue without the attachment for now."
+          description="The event changes were saved successfully, but the marketing file upload did not complete. You can continue without the attachment for now."
+        />
+      ) : null}
+      {searchParams?.updated === "saved" ? (
+        <AppToast
+          variant="success"
+          title="Event updated"
+          description="Your event changes were saved successfully."
+        />
+      ) : null}
+      {searchParams?.updated === "submitted" ? (
+        <AppToast
+          variant="success"
+          title="Draft submitted"
+          description="Your updated draft has entered the approval chain."
         />
       ) : null}
 
@@ -161,6 +180,15 @@ export default async function EventDetailPage({
           </div>
           <div className="flex flex-wrap gap-3">
             <StatusBadge status={event.status ?? "draft"} />
+            {canEditEvent ? (
+              <Link
+                href={`/events/${event.id}/edit`}
+                prefetch={false}
+                className="inline-flex items-center justify-center rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:border-stone-400 hover:bg-stone-50"
+              >
+                Edit event
+              </Link>
+            ) : null}
             {canResubmit ? <ResubmitButton eventId={event.id} /> : null}
           </div>
         </div>

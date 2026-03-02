@@ -4,6 +4,12 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createNotification } from "@/app/(dashboard)/notifications/actions";
 import {
+  buildApprovalChain,
+  createApprovalRoutingDependencies,
+  createSupabaseApprovalRoutingRepository,
+  type SupabaseLike,
+} from "@/lib/routing/approval-router";
+import {
   sendApprovalRequestEmail,
   sendAlternativeSuggestedEmail,
   sendEventApprovedEmail,
@@ -458,6 +464,7 @@ export async function resubmitEvent(input: {
   }
 
   const supabase = createClient();
+  const querySupabase = supabase as any;
 
   try {
     const actor = await getActiveActor(supabase);
@@ -471,25 +478,38 @@ export async function resubmitEvent(input: {
       throw new Error("Only events awaiting revision can be resubmitted.");
     }
 
-    const { error: stepsError } = await supabase
+    const routingDependencies = createApprovalRoutingDependencies(
+      createSupabaseApprovalRoutingRepository(querySupabase as SupabaseLike),
+    );
+    const approvalChain = await buildApprovalChain(
+      event.entityType,
+      event.entityId,
+      event.gradeLevel,
+      routingDependencies,
+    );
+
+    const { error: deleteStepsError } = await supabase
       .from("approval_steps")
-      .update({
-        status: "pending",
-        reason: null,
-        suggested_date: null,
-        suggested_start_time: null,
-        actioned_at: null,
-      })
+      .delete()
       .eq("event_id", parsedInput.data.eventId);
 
-    if (stepsError) {
-      throw new Error(stepsError.message);
+    if (deleteStepsError) {
+      throw new Error(deleteStepsError.message);
     }
 
-    const firstStep = await getStepByNumber(supabase, parsedInput.data.eventId, 1);
+    const approvalStepRows = approvalChain.approverIds.map((approverId, index) => ({
+      event_id: parsedInput.data.eventId,
+      approver_id: approverId,
+      step_number: index + 1,
+      status: "pending" as const,
+    }));
 
-    if (!firstStep) {
-      throw new Error("The approval chain could not be restarted.");
+    const { error: insertStepsError } = await supabase
+      .from("approval_steps")
+      .insert(approvalStepRows);
+
+    if (insertStepsError) {
+      throw new Error(insertStepsError.message);
     }
 
     const { error: eventError } = await supabase
@@ -507,15 +527,18 @@ export async function resubmitEvent(input: {
     await runNonCriticalEffect(
       `resubmit event notifications:${parsedInput.data.eventId}`,
       async () => {
-        const facilitiesRecipient = await getFacilitiesRecipient(supabase);
+        const [firstApprover, facilitiesRecipient] = await Promise.all([
+          getUserContact(supabase, approvalChain.approverIds[0]),
+          getUserContact(supabase, approvalChain.ccUserId),
+        ]);
 
         await settleNonCriticalEffects(
           `resubmit event in-app notifications:${parsedInput.data.eventId}`,
           getResubmissionNotifications({
             eventId: parsedInput.data.eventId,
             eventName: event.name,
-            firstApproverId: firstStep.approverId,
-            facilitiesDirectorId: facilitiesRecipient?.id,
+            firstApproverId: approvalChain.approverIds[0],
+            facilitiesDirectorId: approvalChain.ccUserId,
           }).map((notification) =>
             createNotification(
               notification.userId,
@@ -524,10 +547,6 @@ export async function resubmitEvent(input: {
             ),
           ),
         );
-
-        const [firstApprover] = await Promise.all([
-          getUserContact(supabase, firstStep.approverId),
-        ]);
 
         await settleNonCriticalEffects(
           `resubmit event email notifications:${parsedInput.data.eventId}`,
@@ -733,7 +752,17 @@ async function getWorkflowEvent(
 ) {
   const { data: event, error } = await supabase
     .from("events")
-    .select("id, name, status, current_step, submitter_id")
+    .select(
+      `
+        id,
+        name,
+        status,
+        current_step,
+        submitter_id,
+        grade_level,
+        entity:entities!events_entity_id_fkey(id, type)
+      `,
+    )
     .eq("id", eventId)
     .maybeSingle();
 
@@ -749,12 +778,21 @@ async function getWorkflowEvent(
     throw new Error("Event submitter could not be resolved.");
   }
 
+  const entity = Array.isArray(event.entity) ? event.entity[0] : event.entity;
+
+  if (!entity?.id || !entity.type) {
+    throw new Error("Event entity could not be resolved.");
+  }
+
   return {
     id: event.id,
     name: event.name,
     status: event.status ?? "draft",
     currentStep: event.current_step ?? 1,
     submitterId: event.submitter_id,
+    gradeLevel: event.grade_level ?? "HS",
+    entityId: entity.id,
+    entityType: entity.type,
   };
 }
 
@@ -839,28 +877,6 @@ async function getUserContact(
     id: data.id,
     email: data.email,
     name: data.name,
-  };
-}
-
-async function getFacilitiesRecipient(supabase: ReturnType<typeof createClient>) {
-  const { data, error } = await supabase
-    .from("users")
-    .select("id, email")
-    .eq("title", "Facilities Director")
-    .eq("active", true)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  if (!data) {
-    return null;
-  }
-
-  return {
-    id: data.id,
-    email: data.email,
   };
 }
 
