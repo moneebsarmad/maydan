@@ -349,62 +349,60 @@ export function CalendarShell({ events }: CalendarShellProps) {
                 </span>
               );
             })}
+            {entityTypes.length === 0 ? (
+              <span className="text-xs font-medium text-stone-500">
+                No approved events yet.
+              </span>
+            ) : null}
           </div>
         </div>
       </section>
 
       <section className="rounded-[2rem] border border-stone-200 bg-white p-6 shadow-sm">
-        {rangeEvents.length ? (
-          <>
-            {view === "month" ? (
-              <MonthCalendarView
-                currentDate={currentDate}
-                events={rangeEvents}
-                monthDays={monthDays}
-                selectedDate={selectedDate}
-                selectedEventId={selectedEventId}
-                onOpenEvent={openEventDetails}
-                onSelectDate={setSelectedDate}
-              />
-            ) : null}
+        <>
+          {view === "month" ? (
+            <MonthCalendarView
+              currentDate={currentDate}
+              events={rangeEvents}
+              monthDays={monthDays}
+              selectedDate={selectedDate}
+              selectedEventId={selectedEventId}
+              onOpenEvent={openEventDetails}
+              onSelectDate={setSelectedDate}
+            />
+          ) : null}
 
-            {view === "week" ? (
-              <WeekCalendarView
-                currentDate={currentDate}
-                events={rangeEvents}
-                selectedDate={selectedDate}
-                selectedEventId={selectedEventId}
-                weekDays={weekDays}
-                onOpenEvent={openEventDetails}
-                onSelectDate={setSelectedDate}
-              />
-            ) : null}
+          {view === "week" ? (
+            <WeekCalendarView
+              currentDate={currentDate}
+              events={rangeEvents}
+              selectedDate={selectedDate}
+              selectedEventId={selectedEventId}
+              weekDays={weekDays}
+              onOpenEvent={openEventDetails}
+              onSelectDate={setSelectedDate}
+            />
+          ) : null}
 
-            {view === "list" ? (
-              <ListCalendarView
-                currentDate={currentDate}
-                events={rangeEvents}
-                selectedEventId={selectedEventId}
-                onOpenEvent={openEventDetails}
-              />
-            ) : null}
+          {view === "list" ? (
+            <ListCalendarView
+              currentDate={currentDate}
+              events={rangeEvents}
+              selectedEventId={selectedEventId}
+              onOpenEvent={openEventDetails}
+            />
+          ) : null}
 
-            {view === "facilities" ? (
-              <FacilitiesCalendarView
-                currentDate={currentDate}
-                events={rangeEvents}
-                facilityFilter={facilityFilter}
-                selectedEventId={selectedEventId}
-                onOpenEvent={openEventDetails}
-              />
-            ) : null}
-          </>
-        ) : (
-          <EmptyState
-            title="No approved events match this view"
-            description="Adjust the filters or move to another date range to review approved events."
-          />
-        )}
+          {view === "facilities" ? (
+            <FacilitiesCalendarView
+              currentDate={currentDate}
+              events={rangeEvents}
+              facilityFilter={facilityFilter}
+              selectedEventId={selectedEventId}
+              onOpenEvent={openEventDetails}
+            />
+          ) : null}
+        </>
       </section>
 
       <EventDetailsDialog
@@ -663,6 +661,31 @@ function ListCalendarView({
   onOpenEvent: (event: CalendarEvent) => void;
 }) {
   const groupedEvents = groupEventsByDate(events);
+
+  if (groupedEvents.length === 0) {
+    return (
+      <div className="space-y-5">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.24em] text-stone-500">
+              List view
+            </p>
+            <h3 className="mt-2 text-2xl font-semibold text-slate-950">
+              Next 30 days from {format(currentDate, "MMMM d, yyyy")}
+            </h3>
+          </div>
+          <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-stone-600">
+            Mobile-friendly agenda
+          </span>
+        </div>
+
+        <EmptyState
+          title="No approved events in this list"
+          description="Approved events will appear here once the calendar has live entries in this date range."
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
