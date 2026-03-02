@@ -3,9 +3,13 @@ import assert from "node:assert/strict";
 import {
   buildApprovalChain,
   createApprovalRoutingDependencies,
+  type DepartmentApprovalChainStepRecord,
 } from "../lib/routing/approval-router";
 
-function createDependencies() {
+function createDependencies(options?: {
+  departmentChainSteps?: Record<string, DepartmentApprovalChainStepRecord[]>;
+  activeUserIds?: string[];
+}) {
   return createApprovalRoutingDependencies({
     async getEntityHeadUserId(entityId) {
       const entityHeads: Record<string, string> = {
@@ -14,6 +18,7 @@ function createDependencies() {
         athleticsEntity: "coach-id",
         hsDepartmentEntity: "hs-department-head-id",
         msDepartmentEntity: "ms-department-head-id",
+        configuredDepartmentEntity: "configured-department-head-id",
       };
 
       return entityHeads[entityId] ?? null;
@@ -36,6 +41,12 @@ function createDependencies() {
       }
 
       return null;
+    },
+    async getActiveDepartmentChainSteps(entityId, gradeLevel) {
+      return options?.departmentChainSteps?.[`${entityId}:${gradeLevel}`] ?? null;
+    },
+    async getActiveUserId(userId) {
+      return options?.activeUserIds?.includes(userId) ? userId : null;
     },
   });
 }
@@ -110,6 +121,49 @@ test("MS department returns Department Head then MS Principal", async () => {
   assert.deepEqual(result.approverIds, [
     "ms-department-head-id",
     "ms-principal-id",
+  ]);
+  assert.equal(result.ccUserId, "facilities-director-id");
+});
+
+test("Configured department chain overrides the default department fallback", async () => {
+  const result = await buildApprovalChain(
+    "department",
+    "configuredDepartmentEntity",
+    "HS",
+    createDependencies({
+      departmentChainSteps: {
+        "configuredDepartmentEntity:HS": [
+          {
+            stepNumber: 1,
+            sourceType: "specific_user",
+            userId: "custom-reviewer-id",
+            titleKey: null,
+            isBlocking: true,
+          },
+          {
+            stepNumber: 2,
+            sourceType: "title_lookup",
+            userId: null,
+            titleKey: "HS Principal",
+            isBlocking: true,
+          },
+          {
+            stepNumber: 3,
+            sourceType: "specific_user",
+            userId: "final-signer-id",
+            titleKey: null,
+            isBlocking: true,
+          },
+        ],
+      },
+      activeUserIds: ["custom-reviewer-id", "final-signer-id"],
+    }),
+  );
+
+  assert.deepEqual(result.approverIds, [
+    "custom-reviewer-id",
+    "hs-principal-id",
+    "final-signer-id",
   ]);
   assert.equal(result.ccUserId, "facilities-director-id");
 });

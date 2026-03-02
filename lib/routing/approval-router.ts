@@ -1,4 +1,8 @@
-import type { EntityType, GradeLevel } from "../../types";
+import type {
+  ApprovalChainStepSource,
+  EntityType,
+  GradeLevel,
+} from "../../types";
 
 type SupabaseSingleResult<T> = Promise<{
   data: T | null;
@@ -8,12 +12,21 @@ type SupabaseSingleResult<T> = Promise<{
 export interface ApprovalRoutingRepository {
   getEntityHeadUserId(entityId: string): Promise<string | null>;
   getUserIdByTitle(titles: string[]): Promise<string | null>;
+  getActiveDepartmentChainSteps?(
+    entityId: string,
+    gradeLevel: "MS" | "HS",
+  ): Promise<DepartmentApprovalChainStepRecord[] | null>;
+  getActiveUserId?(userId: string): Promise<string | null>;
 }
 
 export interface ApprovalRoutingDependencies {
   getClubAdviser(entityId: string): Promise<string>;
   getHouseMentor(entityId: string): Promise<string>;
   getSubmittingCoach(entityId: string): Promise<string>;
+  getConfiguredDepartmentChain(
+    entityId: string,
+    gradeLevel: "MS" | "HS",
+  ): Promise<string[] | null>;
   getTarbiyahDirector(): Promise<string>;
   getAthleticDirector(): Promise<string>;
   getDepartmentHead(entityId: string): Promise<string>;
@@ -25,6 +38,14 @@ export interface ApprovalRoutingDependencies {
 export interface ApprovalChainResult {
   approverIds: string[];
   ccUserId: string;
+}
+
+export interface DepartmentApprovalChainStepRecord {
+  stepNumber: number;
+  sourceType: ApprovalChainStepSource;
+  userId: string | null;
+  titleKey: string | null;
+  isBlocking: boolean;
 }
 
 export interface SupabaseLike {
@@ -39,6 +60,43 @@ export interface SupabaseLike {
     select(columns: string): {
       in(column: "title", values: string[]): {
         maybeSingle(): SupabaseSingleResult<{ id: string }>;
+      };
+      eq(column: "id", value: string): {
+        eq(column: "active", value: boolean): {
+          maybeSingle(): SupabaseSingleResult<{ id: string }>;
+        };
+      };
+    };
+  };
+  from(table: "approval_chain_templates"): {
+    select(columns: string): {
+      eq(column: "entity_id", value: string): {
+        eq(column: "grade_level", value: "MS" | "HS"): {
+          eq(column: "active", value: boolean): {
+            maybeSingle(): SupabaseSingleResult<{ id: string }>;
+          };
+        };
+      };
+    };
+  };
+  from(table: "approval_chain_template_steps"): {
+    select(columns: string): {
+      eq(column: "template_id", value: string): {
+        order(
+          column: "step_number",
+          options: { ascending: boolean },
+        ): Promise<{
+          data:
+            | Array<{
+                step_number: number;
+                source_type: ApprovalChainStepSource;
+                user_id: string | null;
+                title_key: string | null;
+                is_blocking: boolean;
+              }>
+            | null;
+          error: { message: string } | null;
+        }>;
       };
     };
   };
@@ -74,6 +132,61 @@ export function createSupabaseApprovalRoutingRepository(
 
       return data?.id ?? null;
     },
+    async getActiveDepartmentChainSteps(entityId, gradeLevel) {
+      const { data: template, error: templateError } = await supabase
+        .from("approval_chain_templates")
+        .select("id")
+        .eq("entity_id", entityId)
+        .eq("grade_level", gradeLevel)
+        .eq("active", true)
+        .maybeSingle();
+
+      if (templateError) {
+        throw new Error(
+          `Unable to read department approval chain template: ${templateError.message}`,
+        );
+      }
+
+      if (!template) {
+        return null;
+      }
+
+      const { data: steps, error: stepsError } = await supabase
+        .from("approval_chain_template_steps")
+        .select("step_number, source_type, user_id, title_key, is_blocking")
+        .eq("template_id", template.id)
+        .order("step_number", { ascending: true });
+
+      if (stepsError) {
+        throw new Error(
+          `Unable to read department approval chain steps: ${stepsError.message}`,
+        );
+      }
+
+      return (
+        steps?.map((step) => ({
+          stepNumber: step.step_number,
+          sourceType: step.source_type,
+          userId: step.user_id,
+          titleKey: step.title_key,
+          isBlocking: step.is_blocking,
+        })) ?? null
+      );
+    },
+    async getActiveUserId(userId) {
+      const { data, error } = await supabase
+        .from("users")
+        .select("id")
+        .eq("id", userId)
+        .eq("active", true)
+        .maybeSingle();
+
+      if (error) {
+        throw new Error(`Unable to read user by id: ${error.message}`);
+      }
+
+      return data?.id ?? null;
+    },
   };
 }
 
@@ -87,6 +200,60 @@ export function createApprovalRoutingDependencies(
       getRequiredEntityHeadUser(repository, entityId, "House Mentor"),
     getSubmittingCoach: (entityId) =>
       getRequiredEntityHeadUser(repository, entityId, "PE Teacher/Coach"),
+    getConfiguredDepartmentChain: async (entityId, gradeLevel) => {
+      const configuredSteps = await repository.getActiveDepartmentChainSteps?.(
+        entityId,
+        gradeLevel,
+      );
+
+      if (!configuredSteps?.length) {
+        return null;
+      }
+
+      const approverIds: string[] = [];
+
+      for (const step of configuredSteps) {
+        if (!step.isBlocking) {
+          continue;
+        }
+
+        switch (step.sourceType) {
+          case "entity_head":
+            approverIds.push(
+              await getRequiredEntityHeadUser(
+                repository,
+                entityId,
+                `Configured approval step ${step.stepNumber}`,
+              ),
+            );
+            break;
+          case "specific_user":
+            approverIds.push(
+              await getRequiredActiveUserId(
+                repository,
+                step.userId,
+                `Configured approval step ${step.stepNumber}`,
+              ),
+            );
+            break;
+          case "title_lookup":
+            approverIds.push(
+              await getRequiredUserByTitle(
+                repository,
+                [step.titleKey ?? ""],
+                `Configured approval step ${step.stepNumber}`,
+              ),
+            );
+            break;
+          default: {
+            const exhaustiveCheck: never = step.sourceType;
+            throw new Error(`Unsupported configured step source: ${exhaustiveCheck}`);
+          }
+        }
+      }
+
+      return approverIds.length > 0 ? approverIds : null;
+    },
     getTarbiyahDirector: () =>
       getRequiredUserByTitle(repository, ["Tarbiyah Director"], "Tarbiyah Director"),
     getAthleticDirector: () =>
@@ -200,12 +367,25 @@ export async function buildApprovalChain(
       approverIds.push(await dependencies.getHSPrincipal());
       break;
     case "department":
-      approverIds.push(await dependencies.getDepartmentHead(entityId));
-      approverIds.push(
-        gradeLevel === "MS"
-          ? await dependencies.getMSPrincipal()
-          : await dependencies.getHSPrincipal(),
-      );
+      {
+        const configuredDepartmentChain =
+          await dependencies.getConfiguredDepartmentChain(
+            entityId,
+            toDepartmentChainGradeLevel(gradeLevel),
+          );
+
+        if (configuredDepartmentChain?.length) {
+          approverIds.push(...configuredDepartmentChain);
+          break;
+        }
+
+        approverIds.push(await dependencies.getDepartmentHead(entityId));
+        approverIds.push(
+          gradeLevel === "MS"
+            ? await dependencies.getMSPrincipal()
+            : await dependencies.getHSPrincipal(),
+        );
+      }
       break;
     default: {
       const exhaustiveCheck: never = entityType;
@@ -217,6 +397,10 @@ export async function buildApprovalChain(
     approverIds,
     ccUserId: await dependencies.getFacilitiesDirector(),
   };
+}
+
+function toDepartmentChainGradeLevel(gradeLevel: GradeLevel): "MS" | "HS" {
+  return gradeLevel === "MS" ? "MS" : "HS";
 }
 
 async function getRequiredEntityHeadUser(
@@ -245,4 +429,22 @@ async function getRequiredUserByTitle(
   }
 
   return userId;
+}
+
+async function getRequiredActiveUserId(
+  repository: ApprovalRoutingRepository,
+  userId: string | null,
+  roleLabel: string,
+) {
+  if (!userId) {
+    throw new Error(`${roleLabel} is not configured.`);
+  }
+
+  const resolvedUserId = await repository.getActiveUserId?.(userId);
+
+  if (!resolvedUserId) {
+    throw new Error(`${roleLabel} user is not active.`);
+  }
+
+  return resolvedUserId;
 }

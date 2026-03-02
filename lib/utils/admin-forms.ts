@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { UserRole } from "@/types";
+import type { ApprovalChainStepSource, UserRole } from "@/types";
 
 const roleOptions = ["staff", "approver", "viewer", "admin"] as const;
 export const entityTypeOptions = [
@@ -9,6 +9,12 @@ export const entityTypeOptions = [
   "athletics",
 ] as const;
 export const gradeLevelOptions = ["MS", "HS", "Both"] as const;
+export const departmentChainGradeLevelOptions = ["MS", "HS"] as const;
+export const approvalChainStepSourceOptions = [
+  "entity_head",
+  "specific_user",
+  "title_lookup",
+] as const satisfies readonly ApprovalChainStepSource[];
 
 const trimmedOptionalUuid = z.preprocess((value) => {
   const normalizedValue = String(value ?? "").trim();
@@ -91,12 +97,64 @@ export const updateFacilityFormSchema = z.object({
   notes: trimmedOptionalString,
 });
 
+export const approvalChainStepFormSchema = z
+  .object({
+    id: z.string().uuid("Step not found.").optional(),
+    sourceType: z.enum(approvalChainStepSourceOptions, {
+      required_error: "Select a step source type.",
+    }),
+    userId: trimmedOptionalUuid,
+    titleKey: trimmedOptionalString,
+    labelOverride: trimmedOptionalString,
+  })
+  .superRefine((value, context) => {
+    if (value.sourceType === "entity_head") {
+      return;
+    }
+
+    if (value.sourceType === "specific_user" && !value.userId) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Select an approver for a specific-user step.",
+        path: ["userId"],
+      });
+    }
+
+    if (value.sourceType === "title_lookup" && !value.titleKey) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Select a title for a title-lookup step.",
+        path: ["titleKey"],
+      });
+    }
+  });
+
+export const departmentApprovalChainFormSchema = z.object({
+  templateId: z.string().uuid("Chain not found.").optional(),
+  name: z.string().trim().min(1, "Chain name is required."),
+  entityId: z.string().uuid("Department is required."),
+  gradeLevel: z.enum(departmentChainGradeLevelOptions, {
+    required_error: "Select HS or MS.",
+  }),
+  active: z.boolean(),
+  steps: z
+    .array(approvalChainStepFormSchema)
+    .min(1, "At least one approval step is required.")
+    .max(5, "Keep approval chains to five steps or fewer."),
+});
+
 export type InviteUserFormValues = z.infer<typeof inviteUserFormSchema>;
 export type UpdateUserFormValues = z.infer<typeof updateUserFormSchema>;
 export type CreateEntityFormValues = z.infer<typeof createEntityFormSchema>;
 export type UpdateEntityFormValues = z.infer<typeof updateEntityFormSchema>;
 export type CreateFacilityFormValues = z.infer<typeof createFacilityFormSchema>;
 export type UpdateFacilityFormValues = z.infer<typeof updateFacilityFormSchema>;
+export type DepartmentApprovalChainFormValues = z.infer<
+  typeof departmentApprovalChainFormSchema
+>;
+export type DepartmentApprovalChainStepFormValues = z.infer<
+  typeof approvalChainStepFormSchema
+>;
 export type AdminRoleOption = UserRole;
 
 export function getZodErrorMessage(error: z.ZodError) {

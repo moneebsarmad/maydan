@@ -9,6 +9,10 @@ export type EventStatus =
   | "cancelled";
 export type ApprovalStatus = "pending" | "approved" | "rejected";
 export type MarketingPriority = "standard" | "urgent";
+export type ApprovalChainStepSource =
+  | "entity_head"
+  | "specific_user"
+  | "title_lookup";
 
 export interface User {
   id: string;
@@ -99,5 +103,28 @@ export interface Notification {
   event_id: string | null;
   message: string;
   read: boolean | null;
+  created_at: string | null;
+}
+
+export interface ApprovalChainTemplate {
+  id: string;
+  name: string;
+  entity_id: string;
+  grade_level: "MS" | "HS";
+  active: boolean;
+  created_by: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface ApprovalChainTemplateStep {
+  id: string;
+  template_id: string;
+  step_number: number;
+  source_type: ApprovalChainStepSource;
+  user_id: string | null;
+  title_key: string | null;
+  label_override: string | null;
+  is_blocking: boolean;
   created_at: string | null;
 }
