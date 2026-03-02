@@ -1,4 +1,10 @@
-import { expect, test, devices } from "@playwright/test";
+import {
+  expect,
+  test,
+  devices,
+  type ConsoleMessage,
+  type Page,
+} from "@playwright/test";
 
 const submitter = {
   email: "maydan.hosa.submitter@bhaprep.org",
@@ -65,17 +71,17 @@ test("approver queue is desktop-safe and free of browser errors", async ({ brows
   await context.close();
 });
 
-function bindErrorCollectors(page: Parameters<typeof test>[0]["page"]) {
+function bindErrorCollectors(page: Page) {
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];
 
-  page.on("console", (message) => {
+  page.on("console", (message: ConsoleMessage) => {
     if (message.type() === "error") {
       consoleErrors.push(message.text());
     }
   });
 
-  page.on("pageerror", (error) => {
+  page.on("pageerror", (error: Error) => {
     pageErrors.push(String(error));
   });
 
@@ -86,7 +92,7 @@ function bindErrorCollectors(page: Parameters<typeof test>[0]["page"]) {
 }
 
 async function login(
-  page: Parameters<typeof test>[0]["page"],
+  page: Page,
   baseUrl: string,
   credentials: { email: string; password: string },
 ) {
@@ -101,7 +107,7 @@ async function login(
 }
 
 async function hasHorizontalOverflow(
-  page: Parameters<typeof test>[0]["page"],
+  page: Page,
 ) {
   return page.evaluate(
     () => document.documentElement.scrollWidth > window.innerWidth + 1,

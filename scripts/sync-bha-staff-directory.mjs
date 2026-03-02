@@ -59,7 +59,7 @@ const directoryOverridesByEmail = {
     replaceEntityHead: false,
   },
   "sundus.khan@bhaprep.org": {
-    role: "viewer",
+    role: "admin",
     title: "PR Staff",
     entityName: null,
     uniqueTitle: "PR Staff",

@@ -52,7 +52,7 @@ const overridesByEmail: Record<
     entityName: "Athletics",
   },
   "sundus.khan@bhaprep.org": {
-    role: "viewer",
+    role: "admin",
     title: "PR Staff",
     entityName: null,
   },
