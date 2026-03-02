@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { createNotification } from "@/app/(dashboard)/notifications/actions";
 import {
   buildApprovalChain,
@@ -11,10 +12,12 @@ import {
 import {
   sendApprovalRequestEmail,
   sendFacilitiesCcEmail,
+  sendMarketingCommentEmail,
   sendMarketingRequestEmail,
 } from "@/lib/resend/emails";
 import {
   getEventSubmittedNotifications,
+  getMarketingCommentNotifications,
   getMarketingRequestNotifications,
 } from "@/lib/notification-payloads";
 import { createClient } from "@/lib/supabase/server";
@@ -36,6 +39,26 @@ interface EventActionFailure {
 }
 
 export type EventActionResult = EventActionSuccess | EventActionFailure;
+
+interface MarketingCommentActionSuccess {
+  success: true;
+  message: string;
+}
+
+interface MarketingCommentActionFailure {
+  success: false;
+  error: string;
+}
+
+export type MarketingCommentActionResult =
+  | MarketingCommentActionSuccess
+  | MarketingCommentActionFailure;
+
+const marketingCommentSchema = z.object({
+  eventId: z.string().uuid("Event not found."),
+  marketingRequestId: z.string().uuid("Marketing request not found."),
+  comment: z.string().trim().min(1, "A marketing note is required."),
+});
 
 export async function submitEvent(
   values: EventFormValues,
@@ -304,6 +327,109 @@ export async function saveDraft(
   }
 }
 
+export async function addMarketingRequestComment(input: {
+  eventId: string;
+  marketingRequestId: string;
+  comment: string;
+}): Promise<MarketingCommentActionResult> {
+  const parsedInput = marketingCommentSchema.safeParse(input);
+
+  if (!parsedInput.success) {
+    return {
+      success: false,
+      error: parsedInput.error.issues[0]?.message ?? "Marketing note is invalid.",
+    };
+  }
+
+  const supabase = createClient();
+
+  try {
+    const actor = await getActiveMarketingCommentActor(supabase);
+    const { data: marketingRequest, error: marketingRequestError } = await supabase
+      .from("marketing_requests")
+      .select("id, event_id")
+      .eq("id", parsedInput.data.marketingRequestId)
+      .eq("event_id", parsedInput.data.eventId)
+      .maybeSingle();
+
+    if (marketingRequestError) {
+      throw new Error(marketingRequestError.message);
+    }
+
+    if (!marketingRequest) {
+      throw new Error("Marketing request could not be found.");
+    }
+
+    const { error: commentError } = await supabase
+      .from("marketing_request_comments")
+      .insert({
+        marketing_request_id: marketingRequest.id,
+        author_id: actor.id,
+        comment: parsedInput.data.comment,
+      });
+
+    if (commentError) {
+      throw new Error(commentError.message);
+    }
+
+    const event = await getEventForMarketingCommentNotification(
+      supabase,
+      parsedInput.data.eventId,
+    );
+
+    await runNonCriticalEffect(
+      `marketing comment notifications:${parsedInput.data.eventId}`,
+      async () => {
+        await settleNonCriticalEffects(
+          `marketing comment in-app notifications:${parsedInput.data.eventId}`,
+          getMarketingCommentNotifications({
+            eventId: parsedInput.data.eventId,
+            eventName: event.name,
+            submitterId: event.submitter.id,
+            commenterName: actor.name,
+          }).map((notification) =>
+            createNotification(
+              notification.userId,
+              notification.eventId,
+              notification.message,
+            ),
+          ),
+        );
+
+        await settleNonCriticalEffects(
+          `marketing comment email notifications:${parsedInput.data.eventId}`,
+          event.submitter.email
+            ? [
+                sendMarketingCommentEmail(
+                  event.submitter.email,
+                  event.name,
+                  actor.name,
+                  parsedInput.data.comment,
+                  parsedInput.data.eventId,
+                ),
+              ]
+            : [],
+        );
+      },
+    );
+
+    revalidatePhaseFourPaths(parsedInput.data.eventId);
+
+    return {
+      success: true,
+      message: "Marketing note saved. The request owner has been notified.",
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Unable to save the marketing note right now.",
+    };
+  }
+}
+
 async function getActiveProfileWithEntity(
   supabase: ReturnType<typeof createClient>,
 ) {
@@ -340,6 +466,41 @@ async function getActiveProfileWithEntity(
   return {
     id: profile.id,
     entityId: profile.entity_id,
+  };
+}
+
+async function getActiveMarketingCommentActor(
+  supabase: ReturnType<typeof createClient>,
+) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("Authentication required.");
+  }
+
+  const { data: profile, error } = await supabase
+    .from("users")
+    .select("id, name, role, title, active")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!profile?.active) {
+    throw new Error("Your Maydan account is inactive.");
+  }
+
+  if (profile.role !== "admin" && profile.title !== "PR Staff") {
+    throw new Error("Only admin and PR Staff can leave marketing notes.");
+  }
+
+  return {
+    id: profile.id,
+    name: profile.name,
   };
 }
 
@@ -440,4 +601,44 @@ async function getPRStaffRecipients(supabase: any) {
     id: string;
     email: string;
   }>;
+}
+
+async function getEventForMarketingCommentNotification(
+  supabase: ReturnType<typeof createClient>,
+  eventId: string,
+) {
+  const { data, error } = await supabase
+    .from("events")
+    .select(
+      `
+        id,
+        name,
+        submitter:users!events_submitter_id_fkey(id, email)
+      `,
+    )
+    .eq("id", eventId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data) {
+    throw new Error("Event could not be found.");
+  }
+
+  const submitter = Array.isArray(data.submitter) ? data.submitter[0] : data.submitter;
+
+  if (!submitter?.id) {
+    throw new Error("Event submitter could not be resolved.");
+  }
+
+  return {
+    id: data.id,
+    name: data.name,
+    submitter: {
+      id: submitter.id,
+      email: submitter.email ?? null,
+    },
+  };
 }

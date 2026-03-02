@@ -88,6 +88,14 @@ export interface MarketingRequest {
   created_at: string | null;
 }
 
+export interface MarketingRequestComment {
+  id: string;
+  marketing_request_id: string | null;
+  author_id: string | null;
+  comment: string;
+  created_at: string | null;
+}
+
 export interface FacilityConflict {
   id: string;
   event_id: string | null;

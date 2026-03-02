@@ -36,6 +36,21 @@ export function getMarketingRequestNotifications(input: {
   }));
 }
 
+export function getMarketingCommentNotifications(input: {
+  eventId: string;
+  eventName: string;
+  submitterId: string;
+  commenterName: string;
+}): NotificationPayload[] {
+  return [
+    {
+      userId: input.submitterId,
+      eventId: input.eventId,
+      message: `${input.commenterName} added a marketing note to "${input.eventName}".`,
+    },
+  ];
+}
+
 export function getIntermediateApprovalNotifications(input: {
   eventId: string;
   eventName: string;

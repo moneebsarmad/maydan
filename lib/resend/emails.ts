@@ -165,6 +165,33 @@ export async function sendMarketingRequestEmail(
   });
 }
 
+export async function sendMarketingCommentEmail(
+  to: string,
+  eventName: string,
+  commenterName: string,
+  comment: string,
+  eventId: string,
+) {
+  return resend.emails.send({
+    from: fromEmail,
+    to,
+    subject: `Marketing update for "${eventName}"`,
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #0f172a;">
+        <h2 style="margin-bottom: 8px;">Marketing update added</h2>
+        <p>A marketing note was added to your Maydan request.</p>
+        <p><strong>Event:</strong> ${escapeHtml(eventName)}</p>
+        <p><strong>Comment from:</strong> ${escapeHtml(commenterName)}</p>
+        <p><strong>Comment:</strong> ${escapeHtml(comment)}</p>
+        <p>
+          Review the event:
+          <a href="${appUrl}/events/${eventId}">${appUrl}/events/${eventId}</a>
+        </p>
+      </div>
+    `,
+  });
+}
+
 function escapeHtml(value: string) {
   return value
     .replaceAll("&", "&amp;")

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { ApprovalChainProgress } from "@/components/approvals/approval-chain-progress";
 import { FacilityConflictCard } from "@/components/events/facility-conflict-card";
 import { FacilityConflictPanel } from "@/components/events/facility-conflict-panel";
+import { MarketingRequestComments } from "@/components/events/marketing-request-comments";
 import { ResubmitButton } from "@/components/events/resubmit-button";
 import { StatusBadge } from "@/components/events/status-badge";
 import { AppToast } from "@/components/shared/toast";
@@ -76,9 +77,23 @@ export default async function EventDetailPage({
 
   const { data: marketingRequest } = await supabase
     .from("marketing_requests")
-    .select("type, details, target_audience, priority, file_url")
+    .select("id, type, details, target_audience, priority, file_url")
     .eq("event_id", params.id)
     .maybeSingle();
+  const { data: marketingComments } = marketingRequest
+    ? await supabase
+        .from("marketing_request_comments")
+        .select(
+          `
+            id,
+            comment,
+            created_at,
+            author:users!marketing_request_comments_author_id_fkey(name, title)
+          `,
+        )
+        .eq("marketing_request_id", marketingRequest.id)
+        .order("created_at", { ascending: true })
+    : { data: [] };
   const { data: facilityConflict } = await supabase
     .from("facility_conflicts")
     .select("notes, created_at")
@@ -106,6 +121,20 @@ export default async function EventDetailPage({
   const canFlagFacilityConflict =
     event.status === "pending" &&
     (user.role === "admin" || user.title === "Facilities Director");
+  const canCommentOnMarketingRequest =
+    Boolean(marketingRequest) &&
+    (user.role === "admin" || user.title === "PR Staff");
+  const normalizedMarketingComments = (marketingComments ?? []).map((comment) => {
+    const author = Array.isArray(comment.author) ? comment.author[0] : comment.author;
+
+    return {
+      id: comment.id,
+      authorName: author?.name ?? "Maydan staff",
+      authorTitle: author?.title ?? null,
+      comment: comment.comment,
+      createdAt: comment.created_at,
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -204,32 +233,41 @@ export default async function EventDetailPage({
           ) : null}
 
           {marketingRequest ? (
-            <div className="rounded-[1.75rem] border border-sky-200 bg-sky-50/70 p-6 shadow-sm">
-              <p className="text-xs uppercase tracking-[0.24em] text-sky-700">
-                Marketing request
-              </p>
-              <h2 className="mt-2 text-2xl font-semibold text-slate-950">
-                {marketingRequest.type}
-              </h2>
-              <dl className="mt-5 grid gap-5 md:grid-cols-2">
-                <DetailItem
-                  label="Request details"
-                  value={marketingRequest.details ?? "No details provided"}
-                />
-                <DetailItem
-                  label="Target audience"
-                  value={marketingRequest.target_audience ?? "Not specified"}
-                />
-                <DetailItem
-                  label="Priority"
-                  value={marketingRequest.priority ?? "standard"}
-                />
-                <DetailItem
-                  label="Attachment"
-                  value={marketingRequest.file_url ?? "No file attached"}
-                />
-              </dl>
-            </div>
+            <>
+              <div className="rounded-[1.75rem] border border-sky-200 bg-sky-50/70 p-6 shadow-sm">
+                <p className="text-xs uppercase tracking-[0.24em] text-sky-700">
+                  Marketing request
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold text-slate-950">
+                  {marketingRequest.type}
+                </h2>
+                <dl className="mt-5 grid gap-5 md:grid-cols-2">
+                  <DetailItem
+                    label="Request details"
+                    value={marketingRequest.details ?? "No details provided"}
+                  />
+                  <DetailItem
+                    label="Target audience"
+                    value={marketingRequest.target_audience ?? "Not specified"}
+                  />
+                  <DetailItem
+                    label="Priority"
+                    value={marketingRequest.priority ?? "standard"}
+                  />
+                  <DetailItem
+                    label="Attachment"
+                    value={marketingRequest.file_url ?? "No file attached"}
+                  />
+                </dl>
+              </div>
+
+              <MarketingRequestComments
+                eventId={event.id}
+                marketingRequestId={marketingRequest.id}
+                comments={normalizedMarketingComments}
+                canComment={canCommentOnMarketingRequest}
+              />
+            </>
           ) : null}
         </section>
 

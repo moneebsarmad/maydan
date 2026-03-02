@@ -5,6 +5,7 @@ import {
   getEventSubmittedNotifications,
   getFinalApprovalNotifications,
   getIntermediateApprovalNotifications,
+  getMarketingCommentNotifications,
   getMarketingRequestNotifications,
   getRejectionNotifications,
   getResubmissionNotifications,
@@ -152,6 +153,23 @@ test("marketing request notifies every PR recipient", () => {
       userId: "pr-2",
       eventId: "event-5",
       message: 'Marketing requested for "Service Day".',
+    },
+  ]);
+});
+
+test("marketing comments notify the original submitter", () => {
+  const payloads = getMarketingCommentNotifications({
+    eventId: "event-6",
+    eventName: "Senior Brunch",
+    submitterId: "submitter-2",
+    commenterName: "Sundus Khan",
+  });
+
+  assert.deepEqual(payloads, [
+    {
+      userId: "submitter-2",
+      eventId: "event-6",
+      message: 'Sundus Khan added a marketing note to "Senior Brunch".',
     },
   ]);
 });
