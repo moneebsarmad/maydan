@@ -20,6 +20,7 @@ Production URL:
 | --- | --- | --- | --- | --- | --- |
 | Staff | Maydan Demo Staff | `maydan.demo.staff@bhaprep.org` | `MaydanStaff!2026` | `TED Talk Club` | Can submit events |
 | Approver | Maydan Demo Approver | `maydan.demo.approver@bhaprep.org` | `MaydanApprover!2026` | `TED Talk Club` | Set as `TED Talk Club` adviser so submitted demo club events route here first |
+| Approver | Maydan Demo HS Principal | `maydan.demo.hsprincipal@bhaprep.org` | `MaydanHSPrincipal!2026` | — | HS-principal-style demo access without using the real `HS Principal` title, so live routing stays pointed at the real principal |
 | Viewer | Maydan Demo Viewer | `maydan.demo.viewer@bhaprep.org` | `MaydanViewer!2026` | — | Read-only viewer access |
 
 ## Recommended Testing Use
