@@ -12,6 +12,12 @@
   - Resend domain verification and live email delivery validation
   - Lighthouse score capture from this terminal is blocked by local x64 Node and public PSI quota exhaustion
 
+## Supporting Docs
+
+- [Staff launch email](./Maydan_Staff_Launch_Email.md)
+- [Onboarding script](./Maydan_Onboarding_Script.md)
+- [Pilot rollout plan](./Maydan_Pilot_Rollout_Plan.md)
+
 ## Admin Walkthrough
 
 Use `moneeb.sarmad@bhaprep.org`.
