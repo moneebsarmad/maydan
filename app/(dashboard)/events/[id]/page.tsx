@@ -122,7 +122,9 @@ export default async function EventDetailPage({
     event.status === "needs_revision" && event.submitter_id === user.id;
   const canEditEvent =
     event.submitter_id === user.id &&
-    (event.status === "draft" || event.status === "needs_revision");
+    (event.status === "draft" ||
+      event.status === "needs_revision" ||
+      event.status === "pending");
   const canFlagFacilityConflict =
     event.status === "pending" &&
     (user.role === "admin" || user.title === "Facilities Director");
@@ -155,6 +157,13 @@ export default async function EventDetailPage({
           variant="success"
           title="Event updated"
           description="Your event changes were saved successfully."
+        />
+      ) : null}
+      {searchParams?.updated === "restarted" ? (
+        <AppToast
+          variant="success"
+          title="Pending event updated"
+          description="Your changes were saved and the approval chain restarted from Step 1."
         />
       ) : null}
       {searchParams?.updated === "submitted" ? (

@@ -78,7 +78,11 @@ export default async function EditEventPage({ params }: EditEventPageProps) {
     notFound();
   }
 
-  if (event.status !== "draft" && event.status !== "needs_revision") {
+  if (
+    event.status !== "draft" &&
+    event.status !== "needs_revision" &&
+    event.status !== "pending"
+  ) {
     return (
       <div className="space-y-6">
         <section>
@@ -92,7 +96,7 @@ export default async function EditEventPage({ params }: EditEventPageProps) {
 
         <EmptyState
           title="Editing unavailable"
-          description="Only draft or needs revision events can be edited. Pending and approved events stay locked to preserve the approval record."
+          description="Only draft, pending, or needs revision events can be edited. Approved events stay locked to preserve the final record."
         />
       </div>
     );
@@ -137,12 +141,18 @@ export default async function EditEventPage({ params }: EditEventPageProps) {
           Edit event
         </p>
         <h1 className="mt-2 text-4xl font-semibold tracking-tight text-slate-950">
-          {event.status === "draft" ? "Edit draft event" : "Revise event request"}
+          {event.status === "draft"
+            ? "Edit draft event"
+            : event.status === "pending"
+              ? "Edit pending event"
+              : "Revise event request"}
         </h1>
         <p className="mt-3 max-w-3xl text-base leading-7 text-stone-600">
           {event.status === "draft"
             ? "Update the draft and either keep it saved or submit it into the approval chain."
-            : "Make the requested changes, save the updated event, then return to the event page to resubmit it."}
+            : event.status === "pending"
+              ? "Save changes to this pending event and Maydan will restart the approval chain from Step 1 automatically."
+              : "Make the requested changes, save the updated event, then return to the event page to resubmit it."}
         </p>
       </section>
 

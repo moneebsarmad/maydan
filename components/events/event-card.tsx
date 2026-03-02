@@ -20,9 +20,10 @@ export interface EventCardEvent {
 
 interface EventCardProps {
   event: EventCardEvent;
+  editHref?: string | null;
 }
 
-export function EventCard({ event }: EventCardProps) {
+export function EventCard({ event, editHref = null }: EventCardProps) {
   return (
     <article className="rounded-[1.75rem] border border-stone-200 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -69,13 +70,24 @@ export function EventCard({ event }: EventCardProps) {
             </span>
           ) : null}
         </div>
-        <Link
-          href={`/events/${event.id}`}
-          prefetch={false}
-          className="text-sm font-semibold text-slate-950 transition hover:text-amber-900"
-        >
-          View details
-        </Link>
+        <div className="flex items-center gap-3">
+          {editHref ? (
+            <Link
+              href={editHref}
+              prefetch={false}
+              className="text-sm font-semibold text-amber-900 transition hover:text-amber-700"
+            >
+              Edit event
+            </Link>
+          ) : null}
+          <Link
+            href={`/events/${event.id}`}
+            prefetch={false}
+            className="text-sm font-semibold text-slate-950 transition hover:text-amber-900"
+          >
+            View details
+          </Link>
+        </div>
       </div>
     </article>
   );

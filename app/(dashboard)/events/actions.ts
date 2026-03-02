@@ -355,8 +355,9 @@ export async function updateExistingEvent(input: {
     );
     validateFacilityNotes(facility.name, parsedValues.data.facilityNotes);
 
-    const nextStatus =
-      editableEvent.status === "draft" && input.submit ? "pending" : editableEvent.status;
+    const isSubmittingDraft = editableEvent.status === "draft" && input.submit;
+    const isUpdatingPendingEvent = editableEvent.status === "pending";
+    const nextStatus = isSubmittingDraft ? "pending" : editableEvent.status;
 
     const { error: eventError } = await supabase
       .from("events")
@@ -375,10 +376,7 @@ export async function updateExistingEvent(input: {
         marketing_needed: parsedValues.data.marketingNeeded,
         entity_id: entity.id,
         status: nextStatus,
-        current_step:
-          editableEvent.status === "draft" && input.submit
-            ? 1
-            : editableEvent.currentStep,
+        current_step: isSubmittingDraft || isUpdatingPendingEvent ? 1 : editableEvent.currentStep,
       })
       .eq("id", input.eventId);
 
@@ -394,7 +392,7 @@ export async function updateExistingEvent(input: {
       existingMarketingFileUrl: editableEvent.marketingRequestFileUrl,
     });
 
-    if (editableEvent.status === "draft" && input.submit) {
+    if (isSubmittingDraft || isUpdatingPendingEvent) {
       const routingDependencies = createApprovalRoutingDependencies(
         createSupabaseApprovalRoutingRepository(querySupabase as SupabaseLike),
       );
@@ -423,10 +421,10 @@ export async function updateExistingEvent(input: {
       }
 
       await runNonCriticalEffect(
-        `submit existing draft notifications:${input.eventId}`,
+        `${isSubmittingDraft ? "submit existing draft" : "update pending event"} notifications:${input.eventId}`,
         async () => {
           await settleNonCriticalEffects(
-            `submit existing draft in-app notifications:${input.eventId}`,
+            `${isSubmittingDraft ? "submit existing draft" : "update pending event"} in-app notifications:${input.eventId}`,
             getEventSubmittedNotifications({
               eventId: input.eventId,
               eventName: parsedValues.data.name,
@@ -447,7 +445,7 @@ export async function updateExistingEvent(input: {
           ]);
 
           await settleNonCriticalEffects(
-            `submit existing draft emails:${input.eventId}`,
+            `${isSubmittingDraft ? "submit existing draft" : "update pending event"} emails:${input.eventId}`,
             [
               recipients.stepOneRecipient?.email
                 ? sendApprovalRequestEmail(
@@ -470,12 +468,12 @@ export async function updateExistingEvent(input: {
 
       if (parsedValues.data.marketingNeeded && marketingRequest) {
         await runNonCriticalEffect(
-          `submit existing draft marketing side effects:${input.eventId}`,
+          `${isSubmittingDraft ? "submit existing draft" : "update pending event"} marketing side effects:${input.eventId}`,
           async () => {
             const prStaffRecipients = await getPRStaffRecipients(querySupabase);
 
             await settleNonCriticalEffects(
-              `submit existing draft marketing notifications:${input.eventId}`,
+              `${isSubmittingDraft ? "submit existing draft" : "update pending event"} marketing notifications:${input.eventId}`,
               getMarketingRequestNotifications({
                 eventId: input.eventId,
                 eventName: parsedValues.data.name,
@@ -490,7 +488,7 @@ export async function updateExistingEvent(input: {
             );
 
             await settleNonCriticalEffects(
-              `submit existing draft marketing emails:${input.eventId}`,
+              `${isSubmittingDraft ? "submit existing draft" : "update pending event"} marketing emails:${input.eventId}`,
               prStaffRecipients.map((recipient) =>
                 sendMarketingRequestEmail(
                   recipient.email,
@@ -718,8 +716,12 @@ async function getEditableEvent(
     throw new Error("You can only edit your own event.");
   }
 
-  if (event.status !== "draft" && event.status !== "needs_revision") {
-    throw new Error("Only draft or needs revision events can be edited.");
+  if (
+    event.status !== "draft" &&
+    event.status !== "needs_revision" &&
+    event.status !== "pending"
+  ) {
+    throw new Error("Only draft, pending, or needs revision events can be edited.");
   }
 
   const { data: marketingRequest, error: marketingError } = await supabase

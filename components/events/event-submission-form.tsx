@@ -129,7 +129,11 @@ export function EventSubmissionForm({
       if (isEditMode) {
         destinationParams.set(
           "updated",
-          eventStatus === "draft" && action === "submit" ? "submitted" : "saved",
+          eventStatus === "draft" && action === "submit"
+            ? "submitted"
+            : eventStatus === "pending"
+              ? "restarted"
+              : "saved",
         );
       }
 
@@ -156,6 +160,8 @@ export function EventSubmissionForm({
         title: isEditMode
           ? eventStatus === "draft" && action === "submit"
             ? "Event submitted"
+            : eventStatus === "pending"
+              ? "Approval restarted"
             : "Changes saved"
           : action === "submit"
             ? "Event submitted"
@@ -164,10 +170,12 @@ export function EventSubmissionForm({
           isEditMode
             ? eventStatus === "draft" && action === "submit"
               ? "The draft was submitted and routed to the first approver."
+              : eventStatus === "pending"
+                ? "Your changes were saved and the approval chain restarted from Step 1."
               : "Your event changes were saved successfully."
             : action === "submit"
-            ? "The event was routed to the first approver successfully."
-            : "The event was saved as a draft without entering the approval chain.",
+              ? "The event was routed to the first approver successfully."
+              : "The event was saved as a draft without entering the approval chain.",
       });
       router.push(destination);
     });

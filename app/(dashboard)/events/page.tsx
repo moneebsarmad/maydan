@@ -143,7 +143,18 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
       {eventCards.length > 0 ? (
         <section className="space-y-4">
           {eventCards.map((event) => (
-            <EventCard event={event} key={event.id} />
+            <EventCard
+              event={event}
+              key={event.id}
+              editHref={
+                isStaffQueue &&
+                (event.status === "draft" ||
+                  event.status === "needs_revision" ||
+                  event.status === "pending")
+                  ? `/events/${event.id}/edit`
+                  : null
+              }
+            />
           ))}
         </section>
       ) : (
