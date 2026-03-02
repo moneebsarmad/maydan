@@ -297,7 +297,7 @@ export async function upsertDepartmentApprovalChainAction(input: unknown) {
   }
 
   const supabase = createClient();
-  const { templateId, entityId, gradeLevel, name, active, steps } =
+  const { templateId, entityId, gradeLevel, name, steps } =
     parsedInput.data;
 
   const { data: entity, error: entityError } = await supabase
@@ -454,7 +454,7 @@ export async function upsertDepartmentApprovalChainAction(input: unknown) {
         name,
         entity_id: entityId,
         grade_level: gradeLevel,
-        active,
+        active: true,
         updated_at: new Date().toISOString(),
       })
       .eq("id", savedTemplateId);
@@ -472,7 +472,7 @@ export async function upsertDepartmentApprovalChainAction(input: unknown) {
         name,
         entity_id: entityId,
         grade_level: gradeLevel,
-        active,
+        active: true,
         created_by: adminId,
         updated_at: new Date().toISOString(),
       })
@@ -537,46 +537,16 @@ export async function upsertDepartmentApprovalChainAction(input: unknown) {
   return {
     success: true as const,
     templateId: savedTemplateId,
-    message: active
-      ? "Department approval chain saved and activated."
-      : "Department approval chain saved as inactive. Live routing will continue using the V1 fallback.",
+    message: "Department approval chain saved.",
   };
 }
 
 export async function deactivateDepartmentApprovalChainAction(input: unknown) {
   await requireAdmin();
-  const templateId = String(
-    (input as { templateId?: string } | null)?.templateId ?? "",
-  ).trim();
-
-  if (!templateId) {
-    return {
-      success: false as const,
-      error: "Chain id is required.",
-    };
-  }
-
-  const supabase = createClient();
-  const { error } = await supabase
-    .from("approval_chain_templates")
-    .update({
-      active: false,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", templateId);
-
-  if (error) {
-    return {
-      success: false as const,
-      error: error.message,
-    };
-  }
-
-  revalidatePath("/admin/approval-chains");
-
   return {
-    success: true as const,
-    message: "Custom routing disabled. Department flow will fall back to V1.",
+    success: false as const,
+    error:
+      "Department approval chains no longer support deactivation. Edit and save the chain instead.",
   };
 }
 

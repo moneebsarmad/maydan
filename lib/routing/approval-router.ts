@@ -379,11 +379,10 @@ export async function buildApprovalChain(
           break;
         }
 
-        approverIds.push(await dependencies.getDepartmentHead(entityId));
-        approverIds.push(
-          gradeLevel === "MS"
-            ? await dependencies.getMSPrincipal()
-            : await dependencies.getHSPrincipal(),
+        throw new Error(
+          `Department approval chain is not configured for entity ${entityId} (${toDepartmentChainGradeLevel(
+            gradeLevel,
+          )}).`,
         );
       }
       break;

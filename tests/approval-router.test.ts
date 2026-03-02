@@ -10,6 +10,49 @@ function createDependencies(options?: {
   departmentChainSteps?: Record<string, DepartmentApprovalChainStepRecord[]>;
   activeUserIds?: string[];
 }) {
+  const defaultDepartmentChainSteps: Record<
+    string,
+    DepartmentApprovalChainStepRecord[]
+  > = {
+    "hsDepartmentEntity:HS": [
+      {
+        stepNumber: 1,
+        sourceType: "entity_head",
+        userId: null,
+        titleKey: null,
+        isBlocking: true,
+      },
+      {
+        stepNumber: 2,
+        sourceType: "title_lookup",
+        userId: null,
+        titleKey: "HS Principal",
+        isBlocking: true,
+      },
+    ],
+    "msDepartmentEntity:MS": [
+      {
+        stepNumber: 1,
+        sourceType: "entity_head",
+        userId: null,
+        titleKey: null,
+        isBlocking: true,
+      },
+      {
+        stepNumber: 2,
+        sourceType: "title_lookup",
+        userId: null,
+        titleKey: "MS Principal",
+        isBlocking: true,
+      },
+    ],
+  };
+  const activeUserIds = new Set([
+    "custom-reviewer-id",
+    "final-signer-id",
+    ...(options?.activeUserIds ?? []),
+  ]);
+
   return createApprovalRoutingDependencies({
     async getEntityHeadUserId(entityId) {
       const entityHeads: Record<string, string> = {
@@ -43,10 +86,14 @@ function createDependencies(options?: {
       return null;
     },
     async getActiveDepartmentChainSteps(entityId, gradeLevel) {
-      return options?.departmentChainSteps?.[`${entityId}:${gradeLevel}`] ?? null;
+      return (
+        options?.departmentChainSteps?.[`${entityId}:${gradeLevel}`] ??
+        defaultDepartmentChainSteps[`${entityId}:${gradeLevel}`] ??
+        null
+      );
     },
     async getActiveUserId(userId) {
-      return options?.activeUserIds?.includes(userId) ? userId : null;
+      return activeUserIds.has(userId) ? userId : null;
     },
   });
 }
@@ -125,7 +172,7 @@ test("MS department returns Department Head then MS Principal", async () => {
   assert.equal(result.ccUserId, "facilities-director-id");
 });
 
-test("Configured department chain overrides the default department fallback", async () => {
+test("Configured department chain drives department routing", async () => {
   const result = await buildApprovalChain(
     "department",
     "configuredDepartmentEntity",
@@ -166,4 +213,17 @@ test("Configured department chain overrides the default department fallback", as
     "final-signer-id",
   ]);
   assert.equal(result.ccUserId, "facilities-director-id");
+});
+
+test("Department routing errors when a configured chain does not exist", async () => {
+  await assert.rejects(
+    () =>
+      buildApprovalChain(
+        "department",
+        "configuredDepartmentEntity",
+        "MS",
+        createDependencies(),
+      ),
+    /Department approval chain is not configured/,
+  );
 });

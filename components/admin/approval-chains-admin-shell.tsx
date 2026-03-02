@@ -9,35 +9,27 @@ import {
   CheckCircle2,
   Layers3,
   Plus,
-  RotateCcw,
   Save,
+  ShieldAlert,
   ShieldCheck,
-  TriangleAlert,
+  UserRound,
 } from "lucide-react";
-import {
-  deactivateDepartmentApprovalChainAction,
-  upsertDepartmentApprovalChainAction,
-} from "@/app/(dashboard)/admin/actions";
+import { upsertDepartmentApprovalChainAction } from "@/app/(dashboard)/admin/actions";
 import { AdminNav } from "@/components/admin/admin-nav";
 import { EmptyState } from "@/components/shared/empty-state";
 import { FormError } from "@/components/shared/form-error";
 import { LoadingLabel } from "@/components/shared/loading-label";
 import { AppToast } from "@/components/shared/toast";
-import { ConfirmModal } from "@/components/shared/confirm-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   buildDefaultDepartmentChainName,
-  buildFallbackDepartmentChainSummary,
   summarizeDepartmentChainLabels,
   type DepartmentApprovalChainEditorStep,
   type DepartmentChainGradeLevel,
 } from "@/lib/approval-chains/department-approval-chain-utils";
-import {
-  approvalChainStepSourceOptions,
-  type DepartmentApprovalChainFormValues,
-} from "@/lib/utils/admin-forms";
+import type { DepartmentApprovalChainFormValues } from "@/lib/utils/admin-forms";
 import { cn } from "@/lib/utils";
 import type { ApprovalChainStepSource, GradeLevel } from "@/types";
 
@@ -87,7 +79,6 @@ interface TitleOption {
 interface EditorState {
   templateId?: string;
   name: string;
-  active: boolean;
   steps: DepartmentApprovalChainEditorStep[];
 }
 
@@ -97,9 +88,22 @@ interface ResolvedStepPreview {
   warning: string | null;
 }
 
-type SlotFilter = "all" | "custom" | "fallback" | "attention";
+interface SlotInsight {
+  configured: boolean;
+  summary: string;
+  warnings: string[];
+}
+
+interface DepartmentGroup {
+  entityId: string;
+  departmentName: string;
+  slots: DepartmentChainSlot[];
+  configuredCount: number;
+  warningCount: number;
+}
 
 const maxSteps = 5;
+const fixedPrincipalTitles = new Set(["HS Principal", "MS Principal"]);
 
 export function ApprovalChainsAdminShell({
   slots,
@@ -107,11 +111,11 @@ export function ApprovalChainsAdminShell({
 }: ApprovalChainsAdminShellProps) {
   const router = useRouter();
   const [search, setSearch] = useState("");
-  const [gradeFilter, setGradeFilter] = useState<"all" | DepartmentChainGradeLevel>(
-    "all",
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState(
+    slots[0]?.entityId ?? "",
   );
-  const [statusFilter, setStatusFilter] = useState<SlotFilter>("all");
-  const [selectedSlotId, setSelectedSlotId] = useState(slots[0]?.slotId ?? "");
+  const [selectedGradeLevel, setSelectedGradeLevel] =
+    useState<DepartmentChainGradeLevel | null>(slots[0]?.gradeLevel ?? null);
   const [editorState, setEditorState] = useState<EditorState | null>(
     slots[0] ? buildEditorState(slots[0]) : null,
   );
@@ -120,10 +124,15 @@ export function ApprovalChainsAdminShell({
     description: string;
     variant: "success" | "error" | "info";
   } | null>(null);
-  const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const titleOptions = useMemo(() => buildTitleOptions(approverUsers), [approverUsers]);
+  const customTitleOptions = useMemo(
+    () =>
+      titleOptions.filter((option) => !fixedPrincipalTitles.has(option.value)),
+    [titleOptions],
+  );
+
   const slotInsights = useMemo(
     () =>
       new Map(
@@ -135,49 +144,71 @@ export function ApprovalChainsAdminShell({
     [approverUsers, slots, titleOptions],
   );
 
-  const filteredSlots = useMemo(() => {
+  const departments = useMemo(
+    () => buildDepartmentGroups(slots, slotInsights),
+    [slotInsights, slots],
+  );
+
+  const filteredDepartments = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
 
-    return slots.filter((slot) => {
-      const insight = slotInsights.get(slot.slotId);
-      const matchesSearch =
-        !normalizedSearch ||
-        slot.departmentName.toLowerCase().includes(normalizedSearch) ||
-        slot.gradeLevel.toLowerCase().includes(normalizedSearch) ||
-        insight?.summary.toLowerCase().includes(normalizedSearch);
-      const matchesGrade =
-        gradeFilter === "all" || slot.gradeLevel === gradeFilter;
-      const matchesStatus =
-        statusFilter === "all" ||
-        (statusFilter === "custom" && insight?.mode === "custom") ||
-        (statusFilter === "fallback" && insight?.mode === "fallback") ||
-        (statusFilter === "attention" && (insight?.warnings.length ?? 0) > 0);
+    return departments.filter((department) => {
+      if (!normalizedSearch) {
+        return true;
+      }
 
-      return matchesSearch && matchesGrade && matchesStatus;
+      return department.departmentName.toLowerCase().includes(normalizedSearch);
     });
-  }, [gradeFilter, search, slotInsights, slots, statusFilter]);
+  }, [departments, search]);
 
   useEffect(() => {
-    if (!filteredSlots.length) {
-      if (slots.length && !selectedSlotId) {
-        setSelectedSlotId(slots[0].slotId);
-      }
+    if (!filteredDepartments.length) {
       return;
     }
 
-    if (!filteredSlots.some((slot) => slot.slotId === selectedSlotId)) {
-      setSelectedSlotId(filteredSlots[0].slotId);
+    if (
+      !selectedDepartmentId ||
+      !filteredDepartments.some(
+        (department) => department.entityId === selectedDepartmentId,
+      )
+    ) {
+      setSelectedDepartmentId(filteredDepartments[0].entityId);
     }
-  }, [filteredSlots, selectedSlotId, slots]);
+  }, [filteredDepartments, selectedDepartmentId]);
 
-  const selectedSlot =
-    filteredSlots.find((slot) => slot.slotId === selectedSlotId) ??
-    slots.find((slot) => slot.slotId === selectedSlotId) ??
-    filteredSlots[0] ??
-    slots[0] ??
+  const selectedDepartment =
+    filteredDepartments.find(
+      (department) => department.entityId === selectedDepartmentId,
+    ) ??
+    departments.find((department) => department.entityId === selectedDepartmentId) ??
+    filteredDepartments[0] ??
+    departments[0] ??
     null;
 
-  const selectedSlotResetKey = `${selectedSlot?.slotId ?? "none"}:${selectedSlot?.template?.id ?? "fallback"}:${selectedSlot?.template?.updatedAt ?? "none"}:${selectedSlot?.template?.active ?? "fallback"}`;
+  useEffect(() => {
+    if (!selectedDepartment?.slots.length) {
+      setSelectedGradeLevel(null);
+      return;
+    }
+
+    if (
+      !selectedGradeLevel ||
+      !selectedDepartment.slots.some(
+        (slot) => slot.gradeLevel === selectedGradeLevel,
+      )
+    ) {
+      setSelectedGradeLevel(selectedDepartment.slots[0].gradeLevel);
+    }
+  }, [selectedDepartment, selectedGradeLevel]);
+
+  const selectedSlot =
+    selectedDepartment?.slots.find(
+      (slot) => slot.gradeLevel === selectedGradeLevel,
+    ) ??
+    selectedDepartment?.slots[0] ??
+    null;
+
+  const selectedSlotResetKey = `${selectedSlot?.slotId ?? "none"}:${selectedSlot?.template?.id ?? "none"}:${selectedSlot?.template?.updatedAt ?? "none"}:${selectedSlot?.template?.active ?? "none"}`;
 
   useEffect(() => {
     if (!selectedSlot) {
@@ -206,42 +237,41 @@ export function ApprovalChainsAdminShell({
   }, [approverUsers, editorState, selectedSlot, titleOptions]);
 
   const summaryCards = useMemo(() => {
-    const totalRoutes = slots.length;
-    const customRoutes = Array.from(slotInsights.values()).filter(
-      (insight) => insight.mode === "custom",
+    const configuredSlots = Array.from(slotInsights.values()).filter(
+      (insight) => insight.configured,
     ).length;
-    const fallbackRoutes = totalRoutes - customRoutes;
-    const attentionRoutes = Array.from(slotInsights.values()).filter(
-      (insight) => insight.warnings.length > 0,
-    ).length;
+    const warningCount = Array.from(slotInsights.values()).reduce(
+      (total, insight) => total + insight.warnings.length,
+      0,
+    );
 
     return [
       {
-        label: "Department Slots",
-        value: `${totalRoutes}`,
-        detail: "Each department/grade slot can run the V1 fallback or a custom chain.",
+        label: "Departments",
+        value: `${departments.length}`,
+        detail: "Select one department at a time and configure its grade-level chain.",
         icon: Layers3,
       },
       {
-        label: "Custom Active",
-        value: `${customRoutes}`,
-        detail: "Department slots currently using a saved live custom chain.",
+        label: "Configured Slots",
+        value: `${configuredSlots}`,
+        detail: "Department grade slots with a saved live custom chain.",
         icon: ShieldCheck,
       },
       {
-        label: "Fallback Live",
-        value: `${fallbackRoutes}`,
-        detail: "Slots still resolving through the original V1 department path.",
-        icon: CheckCircle2,
+        label: "Needs Setup",
+        value: `${slots.length - configuredSlots}`,
+        detail: "Slots without a saved chain. Department submissions are blocked there.",
+        icon: ShieldAlert,
       },
       {
-        label: "Needs Review",
-        value: `${attentionRoutes}`,
-        detail: "Live chain slots with unresolved or ambiguous approver mapping.",
-        icon: TriangleAlert,
+        label: "Open Warnings",
+        value: `${warningCount}`,
+        detail: "Resolution warnings across currently saved or starter chain states.",
+        icon: CheckCircle2,
       },
     ];
-  }, [slotInsights, slots.length]);
+  }, [departments.length, slotInsights, slots.length]);
 
   if (!slots.length) {
     return (
@@ -254,8 +284,8 @@ export function ApprovalChainsAdminShell({
             Department approval chains
           </h1>
           <p className="mt-3 max-w-2xl text-base leading-7 text-stone-600">
-            Custom routing can be assigned per department and grade level once
-            department entities exist.
+            Create department entities first, then configure their custom chains
+            here.
           </p>
         </section>
 
@@ -281,13 +311,13 @@ export function ApprovalChainsAdminShell({
               Department approval chains
             </h1>
             <p className="mt-3 max-w-3xl text-base leading-7 text-stone-600">
-              Configure real department-only approval chains with ordered
-              approvers, live validation, and automatic fallback to the V1
-              routing matrix when a custom chain is inactive.
+              Department routing is now fully custom. Each department grade slot
+              needs a saved chain, and fixed steps like Department Head and the
+              matching Principal stay compact to reduce visual noise.
             </p>
           </div>
           <div className="rounded-full border border-amber-300 bg-amber-100 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-amber-950">
-            Facilities Director remains auto-CC&apos;d
+            No V1 fallback for departments
           </div>
         </div>
       </section>
@@ -328,139 +358,130 @@ export function ApprovalChainsAdminShell({
         })}
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[0.88fr_1.45fr]">
+      <section className="grid gap-6 xl:grid-cols-[0.72fr_1.48fr]">
         <aside className="space-y-4">
           <div className="rounded-[1.75rem] border border-stone-200 bg-white p-5 shadow-sm">
             <div>
               <p className="text-xs uppercase tracking-[0.24em] text-stone-500">
-                Route finder
+                Choose department
               </p>
               <h2 className="mt-2 text-2xl font-semibold text-slate-950">
-                Department slots
+                Edit one at a time
               </h2>
             </div>
 
             <div className="mt-5 space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="approval-chain-search">Search</Label>
+                <Label htmlFor="department-search">Search departments</Label>
                 <Input
-                  id="approval-chain-search"
-                  placeholder="English, Quran, HS..."
+                  id="department-search"
+                  placeholder="Arabic, English, Quran..."
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                 />
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="approval-chain-grade">Grade</Label>
-                  <select
-                    className="h-12 w-full rounded-2xl border border-stone-300 px-4 text-sm text-slate-950 shadow-sm"
-                    id="approval-chain-grade"
-                    value={gradeFilter}
-                    onChange={(event) =>
-                      setGradeFilter(
-                        event.target.value as "all" | DepartmentChainGradeLevel,
-                      )
-                    }
-                  >
-                    <option value="all">All grades</option>
-                    <option value="HS">HS</option>
-                    <option value="MS">MS</option>
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="approval-chain-status">Status</Label>
-                  <select
-                    className="h-12 w-full rounded-2xl border border-stone-300 px-4 text-sm text-slate-950 shadow-sm"
-                    id="approval-chain-status"
-                    value={statusFilter}
-                    onChange={(event) =>
-                      setStatusFilter(event.target.value as SlotFilter)
-                    }
-                  >
-                    <option value="all">All statuses</option>
-                    <option value="custom">Custom active</option>
-                    <option value="fallback">Fallback live</option>
-                    <option value="attention">Needs review</option>
-                  </select>
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="department-select">Department</Label>
+                <select
+                  className="h-12 w-full rounded-2xl border border-stone-300 px-4 text-sm text-slate-950 shadow-sm"
+                  id="department-select"
+                  value={selectedDepartment?.entityId ?? ""}
+                  onChange={(event) => setSelectedDepartmentId(event.target.value)}
+                >
+                  {filteredDepartments.map((department) => (
+                    <option key={department.entityId} value={department.entityId}>
+                      {department.departmentName}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
 
-          {filteredSlots.length ? (
-            <div className="space-y-3">
-              {filteredSlots.map((slot) => {
-                const insight = slotInsights.get(slot.slotId);
-                const isSelected = slot.slotId === selectedSlot?.slotId;
+          {selectedDepartment ? (
+            <>
+              <div className="rounded-[1.75rem] border border-stone-200 bg-white p-5 shadow-sm">
+                <p className="text-xs uppercase tracking-[0.24em] text-stone-500">
+                  Selected department
+                </p>
+                <h3 className="mt-2 text-2xl font-semibold text-slate-950">
+                  {selectedDepartment.departmentName}
+                </h3>
+                <p className="mt-3 text-sm leading-6 text-stone-600">
+                  {selectedDepartment.configuredCount} configured slot
+                  {selectedDepartment.configuredCount === 1 ? "" : "s"} and{" "}
+                  {selectedDepartment.warningCount} warning
+                  {selectedDepartment.warningCount === 1 ? "" : "s"} across its
+                  active grade tabs.
+                </p>
 
-                return (
-                  <button
-                    className={cn(
-                      "w-full rounded-[1.75rem] border bg-white p-5 text-left shadow-sm transition-all duration-300",
-                      isSelected
-                        ? "border-amber-300 ring-2 ring-amber-200/70"
-                        : "border-stone-200 hover:-translate-y-0.5 hover:border-stone-300 hover:shadow-md",
-                    )}
-                    key={slot.slotId}
-                    onClick={() => setSelectedSlotId(slot.slotId)}
-                    type="button"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.24em] text-stone-500">
-                          {slot.gradeLevel} department slot
-                        </p>
-                        <h3 className="mt-2 text-xl font-semibold text-slate-950">
-                          {slot.departmentName}
-                        </h3>
-                      </div>
-                      <span
+                <div className="mt-5 flex flex-wrap gap-3">
+                  {selectedDepartment.slots.map((slot) => {
+                    const insight = slotInsights.get(slot.slotId);
+                    const isActive = slot.slotId === selectedSlot?.slotId;
+
+                    return (
+                      <button
                         className={cn(
-                          "rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]",
-                          insight?.mode === "custom"
-                            ? "bg-emerald-100 text-emerald-950"
-                            : "bg-stone-100 text-stone-700",
+                          "rounded-full border px-4 py-2 text-sm font-semibold transition",
+                          isActive
+                            ? "border-amber-300 bg-amber-100 text-amber-950"
+                            : "border-stone-200 bg-white text-stone-700 hover:border-stone-300 hover:bg-stone-50",
                         )}
+                        key={slot.slotId}
+                        onClick={() => setSelectedGradeLevel(slot.gradeLevel)}
+                        type="button"
                       >
-                        {insight?.mode === "custom" ? "Custom" : "Fallback"}
-                      </span>
-                    </div>
+                        {slot.gradeLevel}
+                        <span className="ml-2 text-xs uppercase tracking-[0.14em]">
+                          {insight?.configured ? "Ready" : "Setup"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
-                    <p className="mt-3 text-sm leading-6 text-stone-600">
-                      {insight?.summary}
-                    </p>
-                    <p className="mt-2 text-sm text-stone-500">
-                      Head approver: {slot.headUserName}
-                    </p>
+              {selectedSlot ? (
+                <div className="rounded-[1.75rem] border border-stone-200 bg-white p-5 shadow-sm">
+                  <p className="text-xs uppercase tracking-[0.24em] text-stone-500">
+                    Current slot status
+                  </p>
+                  <h3 className="mt-2 text-2xl font-semibold text-slate-950">
+                    {selectedSlot.gradeLevel} slot
+                  </h3>
+                  <p className="mt-3 text-sm leading-6 text-stone-600">
+                    {slotInsights.get(selectedSlot.slotId)?.configured
+                      ? "This slot has a saved live chain."
+                      : "This slot does not have a saved chain yet. Department submissions for this slot will fail until you save one."}
+                  </p>
 
-                    <div className="mt-4 flex flex-wrap items-center gap-2">
-                      {slot.template?.updatedAt ? (
-                        <span className="rounded-full bg-stone-100 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-stone-700">
-                          Updated {formatRelativeDate(slot.template.updatedAt)}
-                        </span>
-                      ) : null}
-                      {(insight?.warnings.length ?? 0) > 0 ? (
-                        <span className="rounded-full bg-amber-100 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-amber-950">
-                          {insight?.warnings.length} warning
-                          {(insight?.warnings.length ?? 0) === 1 ? "" : "s"}
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-emerald-950">
-                          Live chain resolves
-                        </span>
-                      )}
+                  {(slotInsights.get(selectedSlot.slotId)?.warnings.length ?? 0) > 0 ? (
+                    <div className="mt-4 space-y-3">
+                      {slotInsights
+                        .get(selectedSlot.slotId)
+                        ?.warnings.map((warning) => (
+                          <div
+                            className="rounded-[1.25rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+                            key={warning}
+                          >
+                            {warning}
+                          </div>
+                        ))}
                     </div>
-                  </button>
-                );
-              })}
-            </div>
+                  ) : (
+                    <div className="mt-4 rounded-[1.25rem] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950">
+                      This slot resolves cleanly with its current saved chain.
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </>
           ) : (
             <EmptyState
-              title="No department slots match those filters"
-              description="Adjust the search, grade, or status filters to find a department chain slot."
+              title="No departments match that search"
+              description="Clear the search or choose a different department name."
             />
           )}
         </aside>
@@ -474,14 +495,12 @@ export function ApprovalChainsAdminShell({
                     Editing
                   </p>
                   <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
-                    {selectedSlot.departmentName}
+                    {selectedSlot.departmentName} / {selectedSlot.gradeLevel}
                   </h2>
                   <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-600">
-                    Grade level: {selectedSlot.gradeLevel}. Entity head:{" "}
-                    {selectedSlot.headUserName}. Live routing is currently{" "}
-                    {slotInsights.get(selectedSlot.slotId)?.mode === "custom"
-                      ? "using this custom chain."
-                      : "falling back to the V1 department path."}
+                    Head approver: {selectedSlot.headUserName}. This slot no
+                    longer falls back to the old matrix. Save a chain here to
+                    make the route live.
                   </p>
                 </div>
 
@@ -489,141 +508,93 @@ export function ApprovalChainsAdminShell({
                   <span
                     className={cn(
                       "rounded-full px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em]",
-                      slotInsights.get(selectedSlot.slotId)?.mode === "custom"
+                      slotInsights.get(selectedSlot.slotId)?.configured
                         ? "bg-emerald-100 text-emerald-950"
-                        : "bg-stone-100 text-stone-700",
+                        : "bg-amber-100 text-amber-950",
                     )}
                   >
-                    {slotInsights.get(selectedSlot.slotId)?.mode === "custom"
-                      ? "Custom active"
-                      : "V1 fallback live"}
+                    {slotInsights.get(selectedSlot.slotId)?.configured
+                      ? "Configured"
+                      : "Needs setup"}
                   </span>
-                  <span className="rounded-full bg-amber-100 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-950">
-                    Facilities Director CC
-                  </span>
-                </div>
-              </div>
-
-              <div className="mt-6 grid gap-4 md:grid-cols-[1.3fr_0.8fr]">
-                <div className="space-y-2">
-                  <Label htmlFor="chain-name">Chain name</Label>
-                  <Input
-                    id="chain-name"
-                    value={editorState.name}
-                    onChange={(event) =>
-                      setEditorState((current) =>
-                        current
-                          ? {
-                              ...current,
-                              name: event.target.value,
-                            }
-                          : current,
-                      )
-                    }
-                  />
-                </div>
-
-                <label className="flex items-center gap-3 rounded-[1.5rem] border border-stone-200 bg-stone-50 px-4 py-3">
-                  <input
-                    checked={editorState.active}
-                    className="h-4 w-4 rounded border-stone-300"
-                    onChange={(event) =>
-                      setEditorState((current) =>
-                        current
-                          ? {
-                              ...current,
-                              active: event.target.checked,
-                            }
-                          : current,
-                      )
-                    }
-                    type="checkbox"
-                  />
-                  <div>
-                    <p className="text-sm font-semibold text-slate-950">
-                      Activate custom chain
-                    </p>
-                    <p className="text-xs leading-5 text-stone-500">
-                      Disable this to keep the saved chain but run live routing
-                      through the V1 fallback.
-                    </p>
-                  </div>
-                </label>
-              </div>
-
-              <div className="mt-6 flex flex-wrap gap-3">
-                <Button
-                  disabled={isPending}
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setToast(null);
-                    setEditorState(buildFallbackEditorState(selectedSlot));
-                  }}
-                >
-                  <RotateCcw className="mr-2 h-4 w-4" />
-                  Use fallback blueprint
-                </Button>
-
-                {selectedSlot.template ? (
                   <Button
                     disabled={isPending}
                     type="button"
-                    variant="ghost"
-                    onClick={() => setConfirmDeactivateOpen(true)}
+                    variant="outline"
+                    onClick={() => {
+                      setToast(null);
+                      setEditorState(buildStarterEditorState(selectedSlot));
+                    }}
                   >
-                    Deactivate custom chain
+                    Use starter chain
                   </Button>
-                ) : null}
+                  <Button
+                    disabled={isPending}
+                    type="button"
+                    onClick={() => {
+                      setToast(null);
 
-                <Button
-                  disabled={isPending}
-                  type="button"
-                  onClick={() => {
-                    setToast(null);
+                      startTransition(async () => {
+                        const result = await upsertDepartmentApprovalChainAction({
+                          templateId: editorState.templateId,
+                          name: editorState.name,
+                          entityId: selectedSlot.entityId,
+                          gradeLevel: selectedSlot.gradeLevel,
+                          active: true,
+                          steps: editorState.steps,
+                        } satisfies DepartmentApprovalChainFormValues);
 
-                    startTransition(async () => {
-                      const result = await upsertDepartmentApprovalChainAction({
-                        templateId: editorState.templateId,
-                        name: editorState.name,
-                        entityId: selectedSlot.entityId,
-                        gradeLevel: selectedSlot.gradeLevel,
-                        active: editorState.active,
-                        steps: editorState.steps,
-                      } satisfies DepartmentApprovalChainFormValues);
+                        if (!result.success) {
+                          setToast({
+                            title: "Save failed",
+                            description: result.error,
+                            variant: "error",
+                          });
+                          return;
+                        }
 
-                      if (!result.success) {
                         setToast({
-                          title: "Save failed",
-                          description: result.error,
-                          variant: "error",
+                          title: "Chain saved",
+                          description: result.message,
+                          variant: "success",
                         });
-                        return;
-                      }
-
-                      setToast({
-                        title: "Chain saved",
-                        description: result.message,
-                        variant: "success",
+                        router.refresh();
                       });
-                      router.refresh();
-                    });
-                  }}
-                >
-                  {isPending ? (
-                    <LoadingLabel label="Saving..." />
-                  ) : (
-                    <>
-                      <Save className="mr-2 h-4 w-4" />
-                      Save chain
-                    </>
-                  )}
-                </Button>
+                    }}
+                  >
+                    {isPending ? (
+                      <LoadingLabel label="Saving..." />
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Save chain
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="mt-6 space-y-2">
+                <Label htmlFor="chain-name">Chain name</Label>
+                <Input
+                  id="chain-name"
+                  value={editorState.name}
+                  onChange={(event) =>
+                    setEditorState((current) =>
+                      current
+                        ? {
+                            ...current,
+                            name: event.target.value,
+                          }
+                        : current,
+                    )
+                  }
+                />
               </div>
             </div>
 
             <div className="rounded-[1.75rem] border border-stone-200 bg-white p-6 shadow-sm">
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <p className="text-xs uppercase tracking-[0.24em] text-stone-500">
                     Ordered approvers
@@ -633,44 +604,92 @@ export function ApprovalChainsAdminShell({
                   </h3>
                 </div>
 
-                <Button
-                  disabled={editorState.steps.length >= maxSteps || isPending}
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    if (editorState.steps.length >= maxSteps) {
-                      setToast({
-                        title: "Step limit reached",
-                        description:
-                          "Keep department approval chains to five steps or fewer.",
-                        variant: "info",
-                      });
-                      return;
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    disabled={
+                      isPending ||
+                      editorState.steps.length >= maxSteps ||
+                      hasEntityHeadStep(editorState.steps)
                     }
-
-                    setEditorState((current) =>
-                      current
-                        ? {
-                            ...current,
-                            steps: [
-                              ...current.steps,
-                              {
-                                sourceType: "specific_user",
-                              },
-                            ],
-                          }
-                        : current,
-                    );
-                  }}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add step
-                </Button>
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                    onClick={() =>
+                      appendStep(
+                        {
+                          sourceType: "entity_head",
+                          labelOverride: "Department Head",
+                        },
+                        setEditorState,
+                      )
+                    }
+                  >
+                    Add Department Head
+                  </Button>
+                  <Button
+                    disabled={
+                      isPending ||
+                      editorState.steps.length >= maxSteps ||
+                      hasFixedPrincipalStep(editorState.steps, selectedSlot.gradeLevel)
+                    }
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                    onClick={() =>
+                      appendStep(
+                        {
+                          sourceType: "title_lookup",
+                          titleKey: getPrincipalTitle(selectedSlot.gradeLevel),
+                          labelOverride: getPrincipalTitle(selectedSlot.gradeLevel),
+                        },
+                        setEditorState,
+                      )
+                    }
+                  >
+                    Add {getPrincipalTitle(selectedSlot.gradeLevel)}
+                  </Button>
+                  <Button
+                    disabled={isPending || editorState.steps.length >= maxSteps}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                    onClick={() =>
+                      appendStep(
+                        {
+                          sourceType: "specific_user",
+                        },
+                        setEditorState,
+                      )
+                    }
+                  >
+                    <UserRound className="mr-2 h-3.5 w-3.5" />
+                    Add Specific User
+                  </Button>
+                  <Button
+                    disabled={isPending || editorState.steps.length >= maxSteps}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                    onClick={() =>
+                      appendStep(
+                        {
+                          sourceType: "title_lookup",
+                        },
+                        setEditorState,
+                      )
+                    }
+                  >
+                    Add Custom Title
+                  </Button>
+                </div>
               </div>
 
               <div className="mt-5 space-y-4">
                 {editorState.steps.map((step, index) => {
                   const stepPreview = editorPreview.steps[index];
+                  const isCompactStep =
+                    isEntityHeadStep(step) ||
+                    isFixedPrincipalTitleStep(step.titleKey);
 
                   return (
                     <article
@@ -682,11 +701,11 @@ export function ApprovalChainsAdminShell({
                           <p className="text-xs uppercase tracking-[0.24em] text-stone-500">
                             Step {index + 1}
                           </p>
-                          <h4 className="mt-2 text-xl font-semibold text-slate-950">
+                          <h4 className="mt-2 text-2xl font-semibold text-slate-950">
                             {stepPreview?.label ?? `Step ${index + 1}`}
                           </h4>
-                          <p className="mt-2 text-sm text-stone-600">
-                            {stepPreview?.resolution ?? "Configure how this approver resolves."}
+                          <p className="mt-2 text-sm leading-6 text-stone-600">
+                            {stepPreview?.resolution ?? "Configure this approver step."}
                           </p>
                         </div>
 
@@ -733,109 +752,134 @@ export function ApprovalChainsAdminShell({
                         </div>
                       </div>
 
-                      <div className="mt-5 grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label htmlFor={`source-type-${index}`}>Source type</Label>
-                          <select
-                            className="h-12 w-full rounded-2xl border border-stone-300 px-4 text-sm text-slate-950 shadow-sm"
-                            id={`source-type-${index}`}
-                            value={step.sourceType}
-                            onChange={(event) =>
-                              updateStep(index, {
-                                sourceType: event.target.value as ApprovalChainStepSource,
-                                userId: undefined,
-                                titleKey: undefined,
-                              })
-                            }
-                          >
-                            {approvalChainStepSourceOptions.map((option) => (
-                              <option key={option} value={option}>
-                                {formatStepSourceLabel(option)}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor={`label-override-${index}`}>
-                            Step label override
-                          </Label>
-                          <Input
-                            id={`label-override-${index}`}
-                            placeholder="Optional label shown to admins"
-                            value={step.labelOverride ?? ""}
-                            onChange={(event) =>
-                              updateStep(index, {
-                                labelOverride: normalizeOptionalValue(
-                                  event.target.value,
-                                ),
-                              })
-                            }
-                          />
-                        </div>
-                      </div>
-
-                      {step.sourceType === "specific_user" ? (
-                        <div className="mt-4 space-y-2">
-                          <Label htmlFor={`specific-user-${index}`}>Approver</Label>
-                          <select
-                            className="h-12 w-full rounded-2xl border border-stone-300 px-4 text-sm text-slate-950 shadow-sm"
-                            id={`specific-user-${index}`}
-                            value={step.userId ?? ""}
-                            onChange={(event) =>
-                              updateStep(index, {
-                                userId: normalizeOptionalValue(event.target.value),
-                              })
-                            }
-                          >
-                            <option value="">Select an approver</option>
-                            {approverUsers.map((user) => (
-                              <option key={user.id} value={user.id}>
-                                {user.name}
-                                {user.title ? ` (${user.title})` : ""}
-                              </option>
-                            ))}
-                          </select>
-                          <FormError message={stepPreview?.warning ?? undefined} />
-                        </div>
-                      ) : null}
-
-                      {step.sourceType === "title_lookup" ? (
-                        <div className="mt-4 space-y-2">
-                          <Label htmlFor={`title-lookup-${index}`}>Lookup title</Label>
-                          <select
-                            className="h-12 w-full rounded-2xl border border-stone-300 px-4 text-sm text-slate-950 shadow-sm"
-                            id={`title-lookup-${index}`}
-                            value={step.titleKey ?? ""}
-                            onChange={(event) =>
-                              updateStep(index, {
-                                titleKey: normalizeOptionalValue(event.target.value),
-                              })
-                            }
-                          >
-                            <option value="">Select a title</option>
-                            {titleOptions.map((option) => (
-                              <option key={option.value} value={option.value}>
-                                {option.value}
-                                {option.count === 1 && option.resolvedUserName
-                                  ? ` (${option.resolvedUserName})`
-                                  : ` (${option.count} matches)`}
-                              </option>
-                            ))}
-                          </select>
-                          <FormError message={stepPreview?.warning ?? undefined} />
-                        </div>
-                      ) : null}
-
-                      {step.sourceType === "entity_head" ? (
-                        <div className="mt-4 rounded-[1.25rem] border border-stone-200 bg-white px-4 py-3 text-sm text-stone-700">
-                          This step resolves to the department&apos;s assigned
-                          head user:{" "}
-                          <span className="font-semibold text-slate-950">
-                            {selectedSlot.headUserName}
+                      {isCompactStep ? (
+                        <div className="mt-5 flex flex-wrap gap-2">
+                          <span className="rounded-full bg-slate-950 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white">
+                            Fixed step
                           </span>
+                          {stepPreview?.warning ? (
+                            <span className="rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-950">
+                              Needs review
+                            </span>
+                          ) : null}
                         </div>
-                      ) : null}
+                      ) : (
+                        <div className="mt-5 space-y-4">
+                          {step.sourceType === "specific_user" ? (
+                            <>
+                              <div className="space-y-2">
+                                <Label htmlFor={`specific-user-label-${index}`}>
+                                  Step label
+                                </Label>
+                                <Input
+                                  id={`specific-user-label-${index}`}
+                                  placeholder="Optional custom label"
+                                  value={step.labelOverride ?? ""}
+                                  onChange={(event) =>
+                                    updateStep(
+                                      index,
+                                      {
+                                        labelOverride: normalizeOptionalValue(
+                                          event.target.value,
+                                        ),
+                                      },
+                                      setEditorState,
+                                    )
+                                  }
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label htmlFor={`specific-user-${index}`}>
+                                  Approver
+                                </Label>
+                                <select
+                                  className="h-12 w-full rounded-2xl border border-stone-300 px-4 text-sm text-slate-950 shadow-sm"
+                                  id={`specific-user-${index}`}
+                                  value={step.userId ?? ""}
+                                  onChange={(event) =>
+                                    updateStep(
+                                      index,
+                                      {
+                                        userId: normalizeOptionalValue(
+                                          event.target.value,
+                                        ),
+                                      },
+                                      setEditorState,
+                                    )
+                                  }
+                                >
+                                  <option value="">Select an approver</option>
+                                  {approverUsers.map((user) => (
+                                    <option key={user.id} value={user.id}>
+                                      {user.name}
+                                      {user.title ? ` (${user.title})` : ""}
+                                    </option>
+                                  ))}
+                                </select>
+                                <FormError message={stepPreview?.warning ?? undefined} />
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="space-y-2">
+                                <Label htmlFor={`title-lookup-label-${index}`}>
+                                  Step label
+                                </Label>
+                                <Input
+                                  id={`title-lookup-label-${index}`}
+                                  placeholder="Optional custom label"
+                                  value={step.labelOverride ?? ""}
+                                  onChange={(event) =>
+                                    updateStep(
+                                      index,
+                                      {
+                                        labelOverride: normalizeOptionalValue(
+                                          event.target.value,
+                                        ),
+                                      },
+                                      setEditorState,
+                                    )
+                                  }
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label htmlFor={`title-lookup-${index}`}>
+                                  Lookup title
+                                </Label>
+                                <select
+                                  className="h-12 w-full rounded-2xl border border-stone-300 px-4 text-sm text-slate-950 shadow-sm"
+                                  id={`title-lookup-${index}`}
+                                  value={step.titleKey ?? ""}
+                                  onChange={(event) =>
+                                    updateStep(
+                                      index,
+                                      {
+                                        titleKey: normalizeOptionalValue(
+                                          event.target.value,
+                                        ),
+                                      },
+                                      setEditorState,
+                                    )
+                                  }
+                                >
+                                  <option value="">Select a title</option>
+                                  {customTitleOptions.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                      {option.value}
+                                      {option.count === 1 && option.resolvedUserName
+                                        ? ` (${option.resolvedUserName})`
+                                        : ` (${option.count} matches)`}
+                                    </option>
+                                  ))}
+                                </select>
+                                <FormError message={stepPreview?.warning ?? undefined} />
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </article>
                   );
                 })}
@@ -890,9 +934,7 @@ export function ApprovalChainsAdminShell({
                   </div>
                 ) : (
                   <div className="mt-5 rounded-[1.25rem] border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-950">
-                    This editor state resolves cleanly. Saving it will produce a
-                    live department chain, and Facilities Director will still be
-                    copied outside the blocking steps.
+                    This chain resolves cleanly and is ready to save live.
                   </div>
                 )}
               </article>
@@ -900,80 +942,61 @@ export function ApprovalChainsAdminShell({
           </section>
         ) : (
           <EmptyState
-            title="Select a department slot"
-            description="Choose a department and grade-level slot on the left to configure its approval chain."
+            title="Choose a department"
+            description="Select a department from the left to configure its grade-level chain."
           />
         )}
       </section>
-
-      <ConfirmModal
-        cancelLabel="Keep active"
-        confirmLabel="Deactivate chain"
-        description="This will keep the saved custom chain on record, but live routing for this slot will immediately fall back to the V1 department path."
-        open={confirmDeactivateOpen}
-        title="Deactivate custom department chain?"
-        onCancel={() => setConfirmDeactivateOpen(false)}
-        onConfirm={() => {
-          if (!selectedSlot?.template) {
-            setConfirmDeactivateOpen(false);
-            return;
-          }
-
-          setToast(null);
-          setConfirmDeactivateOpen(false);
-
-          startTransition(async () => {
-            const result = await deactivateDepartmentApprovalChainAction({
-              templateId: selectedSlot.template?.id,
-            });
-
-            if (!result.success) {
-              setToast({
-                title: "Deactivate failed",
-                description: result.error,
-                variant: "error",
-              });
-              return;
-            }
-
-            setToast({
-              title: "Custom chain disabled",
-              description: result.message,
-              variant: "success",
-            });
-            router.refresh();
-          });
-        }}
-      />
     </div>
   );
+}
 
-  function updateStep(
-    index: number,
-    patch: Partial<DepartmentApprovalChainEditorStep>,
-  ) {
-    setEditorState((current) =>
-      current
-        ? {
-            ...current,
-            steps: current.steps.map((step, stepIndex) =>
-              stepIndex === index ? { ...step, ...patch } : step,
-            ),
-          }
-        : current,
-    );
+function buildDepartmentGroups(
+  slots: DepartmentChainSlot[],
+  slotInsights: Map<string, SlotInsight>,
+) {
+  const groupedDepartments = new Map<string, DepartmentGroup>();
+
+  for (const slot of slots) {
+    const existingDepartment = groupedDepartments.get(slot.entityId);
+    const insight = slotInsights.get(slot.slotId);
+
+    if (!existingDepartment) {
+      groupedDepartments.set(slot.entityId, {
+        entityId: slot.entityId,
+        departmentName: slot.departmentName,
+        slots: [slot],
+        configuredCount: insight?.configured ? 1 : 0,
+        warningCount: insight?.warnings.length ?? 0,
+      });
+      continue;
+    }
+
+    existingDepartment.slots.push(slot);
+    existingDepartment.configuredCount += insight?.configured ? 1 : 0;
+    existingDepartment.warningCount += insight?.warnings.length ?? 0;
   }
+
+  return Array.from(groupedDepartments.values())
+    .map((department) => ({
+      ...department,
+      slots: department.slots.sort((left, right) =>
+        compareGradeLevels(left.gradeLevel, right.gradeLevel),
+      ),
+    }))
+    .sort((left, right) =>
+      left.departmentName.localeCompare(right.departmentName),
+    );
 }
 
 function buildEditorState(slot: DepartmentChainSlot): EditorState {
-  if (!slot.template) {
-    return buildFallbackEditorState(slot);
+  if (!slot.template?.steps.length || !slot.template.active) {
+    return buildStarterEditorState(slot);
   }
 
   return {
     templateId: slot.template.id,
     name: slot.template.name,
-    active: slot.template.active,
     steps: slot.template.steps.map((step) => ({
       id: step.id,
       sourceType: step.sourceType,
@@ -984,15 +1007,15 @@ function buildEditorState(slot: DepartmentChainSlot): EditorState {
   };
 }
 
-function buildFallbackEditorState(slot: DepartmentChainSlot): EditorState {
+function buildStarterEditorState(slot: DepartmentChainSlot): EditorState {
   return {
+    templateId: slot.template?.id,
     name: buildDefaultDepartmentChainName(slot.departmentName, slot.gradeLevel),
-    active: true,
-    steps: getFallbackSteps(slot.gradeLevel),
+    steps: buildStarterSteps(slot.gradeLevel),
   };
 }
 
-function getFallbackSteps(
+function buildStarterSteps(
   gradeLevel: DepartmentChainGradeLevel,
 ): DepartmentApprovalChainEditorStep[] {
   return [
@@ -1002,8 +1025,8 @@ function getFallbackSteps(
     },
     {
       sourceType: "title_lookup",
-      titleKey: gradeLevel === "MS" ? "MS Principal" : "HS Principal",
-      labelOverride: gradeLevel === "MS" ? "MS Principal" : "HS Principal",
+      titleKey: getPrincipalTitle(gradeLevel),
+      labelOverride: getPrincipalTitle(gradeLevel),
     },
   ];
 }
@@ -1012,22 +1035,33 @@ function buildSlotInsight(
   slot: DepartmentChainSlot,
   approverUsers: ApproverOption[],
   titleOptions: TitleOption[],
-) {
-  const activeSteps =
-    slot.template?.active && slot.template.steps.length
-      ? slot.template.steps.map((step) => ({
+): SlotInsight {
+  const configured = Boolean(slot.template?.active && slot.template.steps.length > 0);
+  const preview = buildEditorPreview(
+    slot,
+    configured
+      ? slot.template!.steps.map((step) => ({
           sourceType: step.sourceType,
           userId: step.userId ?? undefined,
           titleKey: step.titleKey ?? undefined,
           labelOverride: step.labelOverride ?? undefined,
         }))
-      : getFallbackSteps(slot.gradeLevel);
-  const preview = buildEditorPreview(slot, activeSteps, approverUsers, titleOptions);
+      : buildStarterSteps(slot.gradeLevel),
+    approverUsers,
+    titleOptions,
+  );
+  const warnings = [...preview.warnings];
+
+  if (!configured) {
+    warnings.unshift(
+      "No saved chain exists for this slot yet. Department submissions will be blocked until you save one.",
+    );
+  }
 
   return {
-    mode: slot.template?.active ? ("custom" as const) : ("fallback" as const),
-    summary: preview.summary || buildFallbackDepartmentChainSummary(slot.gradeLevel),
-    warnings: preview.warnings,
+    configured,
+    summary: preview.summary,
+    warnings,
   };
 }
 
@@ -1059,7 +1093,7 @@ function resolveStepPreview(
   approverUsers: ApproverOption[],
   titleOptions: TitleOption[],
 ): ResolvedStepPreview {
-  if (step.sourceType === "entity_head") {
+  if (isEntityHeadStep(step)) {
     return {
       label: step.labelOverride?.trim() || "Department Head",
       resolution: `Resolves to ${slot.headUserName}.`,
@@ -1082,23 +1116,25 @@ function resolveStepPreview(
       resolution: user
         ? `Resolves to ${user.name}${user.title ? ` (${user.title})` : ""}.`
         : "Select an active admin or approver account.",
-      warning: user ? null : "A specific-user step must target an active admin or approver.",
+      warning: user
+        ? null
+        : "A specific-user step must target an active admin or approver.",
     };
   }
 
   const selectedTitle = titleOptions.find((option) => option.value === step.titleKey);
-  const fallbackLabel = step.titleKey?.trim() || "Title lookup";
+  const fallbackLabel = step.labelOverride?.trim() || step.titleKey?.trim() || "Title lookup";
 
   return {
-    label: step.labelOverride?.trim() || fallbackLabel,
+    label: fallbackLabel,
     resolution: selectedTitle
       ? selectedTitle.count === 1 && selectedTitle.resolvedUserName
         ? `Resolves to ${selectedTitle.resolvedUserName} via the "${selectedTitle.value}" title.`
         : `Currently resolves to ${selectedTitle.count} matching users with the "${selectedTitle.value}" title.`
-      : 'Select a title that resolves to exactly one active admin or approver.',
+      : "Select a title that resolves to exactly one active admin or approver.",
     warning:
       !step.titleKey
-        ? "A title-lookup step needs a title."
+        ? "A custom title step needs a title."
         : !selectedTitle
           ? `No active admin or approver currently has the "${step.titleKey}" title.`
           : selectedTitle.count !== 1
@@ -1145,6 +1181,64 @@ function buildTitleOptions(users: ApproverOption[]): TitleOption[] {
     .sort((left, right) => left.value.localeCompare(right.value));
 }
 
+function hasEntityHeadStep(steps: DepartmentApprovalChainEditorStep[]) {
+  return steps.some((step) => isEntityHeadStep(step));
+}
+
+function hasFixedPrincipalStep(
+  steps: DepartmentApprovalChainEditorStep[],
+  gradeLevel: DepartmentChainGradeLevel,
+) {
+  return steps.some(
+    (step) =>
+      step.sourceType === "title_lookup" &&
+      step.titleKey === getPrincipalTitle(gradeLevel),
+  );
+}
+
+function isEntityHeadStep(step: DepartmentApprovalChainEditorStep) {
+  return step.sourceType === "entity_head";
+}
+
+function isFixedPrincipalTitleStep(titleKey?: string) {
+  return fixedPrincipalTitles.has(titleKey ?? "");
+}
+
+function getPrincipalTitle(gradeLevel: DepartmentChainGradeLevel) {
+  return gradeLevel === "MS" ? "MS Principal" : "HS Principal";
+}
+
+function appendStep(
+  step: DepartmentApprovalChainEditorStep,
+  setEditorState: Dispatch<SetStateAction<EditorState | null>>,
+) {
+  setEditorState((current) =>
+    current
+      ? {
+          ...current,
+          steps: [...current.steps, step],
+        }
+      : current,
+  );
+}
+
+function updateStep(
+  index: number,
+  patch: Partial<DepartmentApprovalChainEditorStep>,
+  setEditorState: Dispatch<SetStateAction<EditorState | null>>,
+) {
+  setEditorState((current) =>
+    current
+      ? {
+          ...current,
+          steps: current.steps.map((step, stepIndex) =>
+            stepIndex === index ? { ...step, ...patch } : step,
+          ),
+        }
+      : current,
+  );
+}
+
 function moveStep(
   index: number,
   direction: "up" | "down",
@@ -1172,32 +1266,16 @@ function moveStep(
   });
 }
 
-function formatStepSourceLabel(sourceType: ApprovalChainStepSource) {
-  switch (sourceType) {
-    case "entity_head":
-      return "Department head";
-    case "specific_user":
-      return "Specific user";
-    case "title_lookup":
-      return "Title lookup";
-    default: {
-      const exhaustiveCheck: never = sourceType;
-      return exhaustiveCheck;
-    }
-  }
-}
+function compareGradeLevels(
+  left: DepartmentChainGradeLevel,
+  right: DepartmentChainGradeLevel,
+) {
+  const order: Record<DepartmentChainGradeLevel, number> = {
+    HS: 0,
+    MS: 1,
+  };
 
-function formatRelativeDate(value: string) {
-  const updatedAt = new Date(value);
-  const diffMs = Date.now() - updatedAt.getTime();
-  const diffHours = Math.max(1, Math.round(diffMs / (1000 * 60 * 60)));
-
-  if (diffHours < 24) {
-    return `${diffHours}h ago`;
-  }
-
-  const diffDays = Math.max(1, Math.round(diffHours / 24));
-  return `${diffDays}d ago`;
+  return order[left] - order[right];
 }
 
 function normalizeOptionalValue(value: string) {
