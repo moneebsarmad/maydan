@@ -414,9 +414,10 @@
 - [x] End-to-end test: rejection + resubmission flow
 - [x] End-to-end test: marketing request notification
 - [x] RLS audit — test with 3 separate role accounts
-- [ ] Confirm no console errors in production build
+- [x] Confirm no console errors in production build
 - [x] Run `next build` — confirm zero build errors
 - [ ] Lighthouse audit — target score > 80
+  - Blocked from this terminal: Lighthouse CLI requires arm64 Node, and the public PageSpeed API quota is exhausted for anonymous requests.
 
 ### Production Seed
 - [x] Seed all facilities in production DB
@@ -426,7 +427,8 @@
 - [x] Confirm all approver chains resolve to real user IDs (with temporary adviser placeholders for Chess Club and TED Talk Club)
 
 ### Launch
-- [ ] Run one real test event end-to-end with real accounts
+- [x] Run one real test event end-to-end with real accounts
+  - Completed on March 2, 2026 with the live English Department chain: Dana Haddad → Susan Almasri → Leila Kayed. The validation event was cleaned up after approval.
 - [ ] Onboarding walkthrough with Admin
 - [ ] Onboarding walkthrough with one submitter per entity type
 - [ ] Onboarding walkthrough with HS Principal
