@@ -32,6 +32,13 @@ import {
 } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 type CalendarView = "month" | "week" | "list" | "facilities";
@@ -106,23 +113,19 @@ export function CalendarShell({ events }: CalendarShellProps) {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(
     events[0]?.id ?? null,
   );
+  const [eventDetailsOpen, setEventDetailsOpen] = useState(false);
 
-  const sortedEvents = useMemo(
-    () => [...events].sort(compareEvents),
-    [events],
-  );
+  const sortedEvents = useMemo(() => [...events].sort(compareEvents), [events]);
 
   const visibleEvents = useMemo(
     () =>
       sortedEvents.filter((event) => {
         const entityTypeMatches =
           entityTypeFilter === "all" || event.entityType === entityTypeFilter;
-        const entityMatches =
-          entityFilter === "all" || event.entity === entityFilter;
+        const entityMatches = entityFilter === "all" || event.entity === entityFilter;
         const facilityMatches =
           facilityFilter === "all" || event.facility === facilityFilter;
-        const gradeMatches =
-          gradeFilter === "all" || event.gradeLevel === gradeFilter;
+        const gradeMatches = gradeFilter === "all" || event.gradeLevel === gradeFilter;
 
         return (
           entityTypeMatches &&
@@ -162,21 +165,11 @@ export function CalendarShell({ events }: CalendarShellProps) {
   const selectedEvent =
     rangeEvents.find((event) => event.id === selectedEventId) ?? null;
 
-  const selectedDayEvents = useMemo(
-    () =>
-      rangeEvents.filter((event) =>
-        isSameDay(parseISO(event.date), selectedDate),
-      ),
-    [rangeEvents, selectedDate],
-  );
-
-  const upcomingEvents = useMemo(
-    () =>
-      rangeEvents
-        .filter((event) => parseISO(event.date) >= startOfDay(selectedDate))
-        .slice(0, 6),
-    [rangeEvents, selectedDate],
-  );
+  useEffect(() => {
+    if (!selectedEvent) {
+      setEventDetailsOpen(false);
+    }
+  }, [selectedEvent]);
 
   const monthDays = useMemo(
     () =>
@@ -213,6 +206,12 @@ export function CalendarShell({ events }: CalendarShellProps) {
     [sortedEvents],
   );
 
+  function openEventDetails(event: CalendarEvent) {
+    setSelectedDate(parseISO(event.date));
+    setSelectedEventId(event.id);
+    setEventDetailsOpen(true);
+  }
+
   return (
     <div className="space-y-6">
       <section className="rounded-[2rem] border border-stone-200 bg-[linear-gradient(145deg,_#ffffff_0%,_#f8fafc_60%,_#f5f5f4_100%)] p-6 shadow-sm">
@@ -226,8 +225,8 @@ export function CalendarShell({ events }: CalendarShellProps) {
                 {getRangeLabel(view, currentDate)}
               </h2>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-stone-600">
-                Approved events only. Switch between overview, operational, and
-                facility-focused views without leaving the calendar.
+                Approved events only. Click any event to open a compact details
+                popup without losing calendar space.
               </p>
             </div>
 
@@ -354,89 +353,65 @@ export function CalendarShell({ events }: CalendarShellProps) {
         </div>
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-[1.42fr_0.82fr]">
-        <section className="rounded-[2rem] border border-stone-200 bg-white p-6 shadow-sm">
-          {rangeEvents.length ? (
-            <>
-              {view === "month" ? (
-                <MonthCalendarView
-                  currentDate={currentDate}
-                  events={rangeEvents}
-                  monthDays={monthDays}
-                  selectedDate={selectedDate}
-                  selectedEventId={selectedEventId}
-                  onSelectDate={setSelectedDate}
-                  onSelectEvent={setSelectedEventId}
-                />
-              ) : null}
+      <section className="rounded-[2rem] border border-stone-200 bg-white p-6 shadow-sm">
+        {rangeEvents.length ? (
+          <>
+            {view === "month" ? (
+              <MonthCalendarView
+                currentDate={currentDate}
+                events={rangeEvents}
+                monthDays={monthDays}
+                selectedDate={selectedDate}
+                selectedEventId={selectedEventId}
+                onOpenEvent={openEventDetails}
+                onSelectDate={setSelectedDate}
+              />
+            ) : null}
 
-              {view === "week" ? (
-                <WeekCalendarView
-                  currentDate={currentDate}
-                  events={rangeEvents}
-                  selectedDate={selectedDate}
-                  selectedEventId={selectedEventId}
-                  weekDays={weekDays}
-                  onSelectDate={setSelectedDate}
-                  onSelectEvent={setSelectedEventId}
-                />
-              ) : null}
+            {view === "week" ? (
+              <WeekCalendarView
+                currentDate={currentDate}
+                events={rangeEvents}
+                selectedDate={selectedDate}
+                selectedEventId={selectedEventId}
+                weekDays={weekDays}
+                onOpenEvent={openEventDetails}
+                onSelectDate={setSelectedDate}
+              />
+            ) : null}
 
-              {view === "list" ? (
-                <ListCalendarView
-                  currentDate={currentDate}
-                  events={rangeEvents}
-                  selectedEventId={selectedEventId}
-                  onSelectDate={setSelectedDate}
-                  onSelectEvent={setSelectedEventId}
-                />
-              ) : null}
+            {view === "list" ? (
+              <ListCalendarView
+                currentDate={currentDate}
+                events={rangeEvents}
+                selectedEventId={selectedEventId}
+                onOpenEvent={openEventDetails}
+              />
+            ) : null}
 
-              {view === "facilities" ? (
-                <FacilitiesCalendarView
-                  currentDate={currentDate}
-                  events={rangeEvents}
-                  facilityFilter={facilityFilter}
-                  selectedEventId={selectedEventId}
-                  onSelectDate={setSelectedDate}
-                  onSelectEvent={setSelectedEventId}
-                />
-              ) : null}
-            </>
-          ) : (
-            <EmptyState
-              title="No approved events match this view"
-              description="Adjust the filters or move to another date range to review approved events."
-            />
-          )}
-        </section>
+            {view === "facilities" ? (
+              <FacilitiesCalendarView
+                currentDate={currentDate}
+                events={rangeEvents}
+                facilityFilter={facilityFilter}
+                selectedEventId={selectedEventId}
+                onOpenEvent={openEventDetails}
+              />
+            ) : null}
+          </>
+        ) : (
+          <EmptyState
+            title="No approved events match this view"
+            description="Adjust the filters or move to another date range to review approved events."
+          />
+        )}
+      </section>
 
-        <aside className="rounded-[2rem] border border-stone-200 bg-white p-6 shadow-sm">
-          {selectedEvent ? (
-            <SelectedEventPanel event={selectedEvent} />
-          ) : selectedDayEvents.length ? (
-            <SelectedDayPanel
-              date={selectedDate}
-              events={selectedDayEvents}
-              selectedEventId={selectedEventId}
-              onSelectEvent={setSelectedEventId}
-            />
-          ) : upcomingEvents.length ? (
-            <UpcomingEventsPanel
-              events={upcomingEvents}
-              rangeLabel={getRangeLabel(view, currentDate)}
-              selectedEventId={selectedEventId}
-              onSelectDate={setSelectedDate}
-              onSelectEvent={setSelectedEventId}
-            />
-          ) : (
-            <EmptyState
-              title="No approved events in this range"
-              description="Move the calendar or change the filters to inspect another set of approved events."
-            />
-          )}
-        </aside>
-      </div>
+      <EventDetailsDialog
+        event={selectedEvent}
+        open={eventDetailsOpen}
+        onOpenChange={setEventDetailsOpen}
+      />
     </div>
   );
 }
@@ -447,16 +422,16 @@ function MonthCalendarView({
   monthDays,
   selectedDate,
   selectedEventId,
+  onOpenEvent,
   onSelectDate,
-  onSelectEvent,
 }: {
   currentDate: Date;
   events: CalendarEvent[];
   monthDays: Date[];
   selectedDate: Date;
   selectedEventId: string | null;
+  onOpenEvent: (event: CalendarEvent) => void;
   onSelectDate: (date: Date) => void;
-  onSelectEvent: (eventId: string) => void;
 }) {
   return (
     <div className="space-y-5">
@@ -504,7 +479,9 @@ function MonthCalendarView({
                     isSameDay(day, selectedDate)
                       ? "border-slate-950 ring-2 ring-slate-200"
                       : "hover:border-stone-300 hover:bg-stone-50",
-                    isToday(day) ? "shadow-[inset_0_0_0_1px_rgba(15,23,42,0.18)]" : null,
+                    isToday(day)
+                      ? "shadow-[inset_0_0_0_1px_rgba(15,23,42,0.18)]"
+                      : null,
                   )}
                   key={day.toISOString()}
                   onClick={() => onSelectDate(startOfDay(day))}
@@ -534,10 +511,7 @@ function MonthCalendarView({
                         event={event}
                         isSelected={selectedEventId === event.id}
                         key={event.id}
-                        onClick={(clickedEvent) => {
-                          onSelectDate(parseISO(clickedEvent.date));
-                          onSelectEvent(clickedEvent.id);
-                        }}
+                        onClick={onOpenEvent}
                       />
                     ))}
 
@@ -570,16 +544,16 @@ function WeekCalendarView({
   selectedDate,
   selectedEventId,
   weekDays,
+  onOpenEvent,
   onSelectDate,
-  onSelectEvent,
 }: {
   currentDate: Date;
   events: CalendarEvent[];
   selectedDate: Date;
   selectedEventId: string | null;
   weekDays: Date[];
+  onOpenEvent: (event: CalendarEvent) => void;
   onSelectDate: (date: Date) => void;
-  onSelectEvent: (eventId: string) => void;
 }) {
   return (
     <div className="space-y-5">
@@ -651,10 +625,7 @@ function WeekCalendarView({
                             : "hover:-translate-y-0.5 hover:shadow-sm",
                         )}
                         key={event.id}
-                        onClick={() => {
-                          onSelectDate(parseISO(event.date));
-                          onSelectEvent(event.id);
-                        }}
+                        onClick={() => onOpenEvent(event)}
                         type="button"
                       >
                         <p className="text-xs font-semibold uppercase tracking-[0.16em] opacity-70">
@@ -684,14 +655,12 @@ function ListCalendarView({
   currentDate,
   events,
   selectedEventId,
-  onSelectDate,
-  onSelectEvent,
+  onOpenEvent,
 }: {
   currentDate: Date;
   events: CalendarEvent[];
   selectedEventId: string | null;
-  onSelectDate: (date: Date) => void;
-  onSelectEvent: (eventId: string) => void;
+  onOpenEvent: (event: CalendarEvent) => void;
 }) {
   const groupedEvents = groupEventsByDate(events);
 
@@ -733,10 +702,7 @@ function ListCalendarView({
                       : "border-stone-200",
                   )}
                   key={event.id}
-                  onClick={() => {
-                    onSelectDate(parseISO(event.date));
-                    onSelectEvent(event.id);
-                  }}
+                  onClick={() => onOpenEvent(event)}
                   type="button"
                 >
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -782,15 +748,13 @@ function FacilitiesCalendarView({
   events,
   facilityFilter,
   selectedEventId,
-  onSelectDate,
-  onSelectEvent,
+  onOpenEvent,
 }: {
   currentDate: Date;
   events: CalendarEvent[];
   facilityFilter: string;
   selectedEventId: string | null;
-  onSelectDate: (date: Date) => void;
-  onSelectEvent: (eventId: string) => void;
+  onOpenEvent: (event: CalendarEvent) => void;
 }) {
   const groupedByFacility = buildFacilityGroups(events, facilityFilter);
 
@@ -863,10 +827,7 @@ function FacilitiesCalendarView({
                               : "hover:-translate-y-0.5 hover:shadow-sm",
                           )}
                           key={event.id}
-                          onClick={() => {
-                            onSelectDate(parseISO(event.date));
-                            onSelectEvent(event.id);
-                          }}
+                          onClick={() => onOpenEvent(event)}
                           type="button"
                         >
                           <p className="text-xs font-semibold uppercase tracking-[0.16em] opacity-70">
@@ -888,175 +849,76 @@ function FacilitiesCalendarView({
   );
 }
 
-function SelectedEventPanel({ event }: { event: CalendarEvent }) {
+function EventDetailsDialog({
+  event,
+  open,
+  onOpenChange,
+}: {
+  event: CalendarEvent | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  if (!event) {
+    return null;
+  }
+
   const style = getEntityTypeStyle(event.entityType);
 
   return (
-    <div className="space-y-5">
-      <p className="text-xs uppercase tracking-[0.24em] text-stone-500">
-        Event details
-      </p>
-      <div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={cn(
-              "rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]",
-              style.badgeClassName,
-            )}
-          >
-            {formatLabel(event.entityType)}
-          </span>
-          <span className="rounded-full bg-stone-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-stone-600">
-            Approved
-          </span>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={cn(
+                "rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]",
+                style.badgeClassName,
+              )}
+            >
+              {formatLabel(event.entityType)}
+            </span>
+            <span className="rounded-full bg-stone-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-stone-600">
+              Approved
+            </span>
+          </div>
+          <DialogTitle className="mt-3 pr-10 text-3xl">
+            {event.name}
+          </DialogTitle>
+          <DialogDescription>
+            {format(parseISO(event.date), "EEEE, MMMM d, yyyy")} ·{" "}
+            {formatTimeRange(event.startTime, event.endTime)}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3 text-sm text-stone-600">
+          <StatCard
+            icon={CalendarDays}
+            label="Date"
+            value={format(parseISO(event.date), "EEEE, MMMM d, yyyy")}
+          />
+          <StatCard
+            icon={Clock3}
+            label="Time"
+            value={formatTimeRange(event.startTime, event.endTime)}
+          />
+          <StatCard
+            icon={Building2}
+            label="Facility"
+            value={event.facility}
+          />
+          <StatCard
+            icon={CalendarDays}
+            label="Entity"
+            value={event.entity}
+          />
+          <StatCard
+            icon={Rows3}
+            label="Grade level"
+            value={event.gradeLevel}
+          />
         </div>
-        <h3 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-          {event.name}
-        </h3>
-      </div>
-
-      <div className="space-y-3 text-sm text-stone-600">
-        <StatCard
-          icon={CalendarDays}
-          label="Date"
-          value={format(parseISO(event.date), "EEEE, MMMM d, yyyy")}
-        />
-        <StatCard
-          icon={Clock3}
-          label="Time"
-          value={formatTimeRange(event.startTime, event.endTime)}
-        />
-        <StatCard
-          icon={Building2}
-          label="Facility"
-          value={event.facility}
-        />
-        <StatCard
-          icon={CalendarDays}
-          label="Entity"
-          value={event.entity}
-        />
-        <StatCard
-          icon={Rows3}
-          label="Grade level"
-          value={event.gradeLevel}
-        />
-      </div>
-    </div>
-  );
-}
-
-function SelectedDayPanel({
-  date,
-  events,
-  selectedEventId,
-  onSelectEvent,
-}: {
-  date: Date;
-  events: CalendarEvent[];
-  selectedEventId: string | null;
-  onSelectEvent: (eventId: string) => void;
-}) {
-  return (
-    <div className="space-y-5">
-      <div>
-        <p className="text-xs uppercase tracking-[0.24em] text-stone-500">
-          Selected day
-        </p>
-        <h3 className="mt-2 text-2xl font-semibold text-slate-950">
-          {format(date, "EEEE, MMMM d")}
-        </h3>
-      </div>
-
-      <div className="space-y-3">
-        {events.map((event) => (
-          <button
-            className={cn(
-              "w-full rounded-[1.5rem] border px-4 py-4 text-left transition",
-              getEntityTypeStyle(event.entityType).pillClassName,
-              selectedEventId === event.id
-                ? "ring-2 ring-slate-200"
-                : "hover:-translate-y-0.5 hover:shadow-sm",
-            )}
-            key={event.id}
-            onClick={() => onSelectEvent(event.id)}
-            type="button"
-          >
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] opacity-70">
-              {formatTimeRange(event.startTime, event.endTime)}
-            </p>
-            <p className="mt-2 text-base font-semibold">{event.name}</p>
-            <p className="mt-1 text-sm opacity-80">{event.facility}</p>
-            <p className="mt-1 text-sm opacity-80">{event.entity}</p>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function UpcomingEventsPanel({
-  events,
-  rangeLabel,
-  selectedEventId,
-  onSelectDate,
-  onSelectEvent,
-}: {
-  events: CalendarEvent[];
-  rangeLabel: string;
-  selectedEventId: string | null;
-  onSelectDate: (date: Date) => void;
-  onSelectEvent: (eventId: string) => void;
-}) {
-  return (
-    <div className="space-y-5">
-      <div>
-        <p className="text-xs uppercase tracking-[0.24em] text-stone-500">
-          Upcoming in view
-        </p>
-        <h3 className="mt-2 text-2xl font-semibold text-slate-950">
-          {rangeLabel}
-        </h3>
-      </div>
-
-      <div className="space-y-3">
-        {events.map((event) => (
-          <button
-            className={cn(
-              "w-full rounded-[1.5rem] border bg-stone-50 px-4 py-4 text-left transition",
-              selectedEventId === event.id
-                ? "border-slate-950 ring-2 ring-slate-200"
-                : "border-stone-200 hover:-translate-y-0.5 hover:bg-white hover:shadow-sm",
-            )}
-            key={event.id}
-            onClick={() => {
-              onSelectDate(parseISO(event.date));
-              onSelectEvent(event.id);
-            }}
-            type="button"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm font-semibold text-slate-950">{event.name}</p>
-              <span
-                className={cn(
-                  "rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]",
-                  getEntityTypeStyle(event.entityType).badgeClassName,
-                )}
-              >
-                {formatLabel(event.entityType)}
-              </span>
-            </div>
-            <p className="mt-2 text-sm text-stone-600">
-              {format(parseISO(event.date), "EEE, MMM d")} ·{" "}
-              {formatTimeRange(event.startTime, event.endTime)}
-            </p>
-            <p className="mt-1 text-sm text-stone-600">
-              {event.facility} · {event.entity}
-            </p>
-          </button>
-        ))}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
