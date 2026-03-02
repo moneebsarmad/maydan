@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "lighthouse": "node scripts/run-lighthouse.mjs",
+    "test:calendar-sync": "rm -rf .test-dist && tsc -p tsconfig.test.json && node --test .test-dist/tests/microsoft-calendar.test.js",
     "test:routing": "rm -rf .test-dist && tsc -p tsconfig.test.json && node --test .test-dist/tests/approval-router.test.js",
     "test:foundation-db": "rm -rf .test-dist && tsc -p tsconfig.test.json && node --test .test-dist/tests/foundation-db.test.js",
     "test:auth-access": "rm -rf .test-dist && tsc -p tsconfig.test.json && node --test .test-dist/tests/auth-access.test.js",

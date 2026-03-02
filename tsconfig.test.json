@@ -15,6 +15,7 @@
     "types": ["node"]
   },
   "include": [
+    "lib/microsoft/**/*.ts",
     "lib/notification-payloads.ts",
     "lib/routing/**/*.ts",
     "lib/supabase/route-access.ts",

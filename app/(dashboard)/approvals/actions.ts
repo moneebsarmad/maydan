@@ -23,6 +23,7 @@ import {
   runNonCriticalEffect,
   settleNonCriticalEffects,
 } from "@/lib/utils/non-critical";
+import { syncApprovedEventToMicrosoftCalendar } from "@/lib/microsoft/calendar-sync";
 
 const eventActionSchema = z.object({
   eventId: z.string().uuid("Event not found."),
@@ -197,6 +198,13 @@ export async function approveStep(input: {
             ? [sendEventApprovedEmail(submitter.email, event.name)]
             : [],
         );
+      },
+    );
+
+    await runNonCriticalEffect(
+      `final approval microsoft calendar sync:${parsedInput.data.eventId}`,
+      async () => {
+        await syncApprovedEventToMicrosoftCalendar(parsedInput.data.eventId);
       },
     );
 

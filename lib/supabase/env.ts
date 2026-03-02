@@ -6,6 +6,13 @@ export const requiredAppEnv = [
   "NEXT_PUBLIC_APP_URL",
 ] as const;
 
+export const requiredMicrosoftCalendarEnv = [
+  "MICROSOFT_GRAPH_TENANT_ID",
+  "MICROSOFT_GRAPH_CLIENT_ID",
+  "MICROSOFT_GRAPH_CLIENT_SECRET",
+  "MICROSOFT_GRAPH_CALENDAR_OWNER",
+] as const;
+
 export function normalizeEnvValue(value?: string | null) {
   if (!value) {
     return "";
@@ -70,4 +77,68 @@ export function getSupabaseServiceRoleKey() {
   }
 
   return serviceRoleKey;
+}
+
+export function hasAnyMicrosoftCalendarSyncEnv() {
+  return requiredMicrosoftCalendarEnv.some((key) =>
+    Boolean(normalizeEnvValue(process.env[key])),
+  );
+}
+
+export function isMicrosoftCalendarSyncConfigured() {
+  return requiredMicrosoftCalendarEnv.every((key) =>
+    Boolean(normalizeEnvValue(process.env[key])),
+  );
+}
+
+export function getMicrosoftGraphTenantId() {
+  return getRequiredMicrosoftCalendarEnv(
+    "MICROSOFT_GRAPH_TENANT_ID",
+    "Missing MICROSOFT_GRAPH_TENANT_ID.",
+  );
+}
+
+export function getMicrosoftGraphClientId() {
+  return getRequiredMicrosoftCalendarEnv(
+    "MICROSOFT_GRAPH_CLIENT_ID",
+    "Missing MICROSOFT_GRAPH_CLIENT_ID.",
+  );
+}
+
+export function getMicrosoftGraphClientSecret() {
+  return getRequiredMicrosoftCalendarEnv(
+    "MICROSOFT_GRAPH_CLIENT_SECRET",
+    "Missing MICROSOFT_GRAPH_CLIENT_SECRET.",
+  );
+}
+
+export function getMicrosoftGraphCalendarOwner() {
+  return getRequiredMicrosoftCalendarEnv(
+    "MICROSOFT_GRAPH_CALENDAR_OWNER",
+    "Missing MICROSOFT_GRAPH_CALENDAR_OWNER.",
+  );
+}
+
+export function getMicrosoftGraphCalendarId() {
+  return normalizeEnvValue(process.env.MICROSOFT_GRAPH_CALENDAR_ID) || null;
+}
+
+export function getMicrosoftGraphTimeZone() {
+  return (
+    normalizeEnvValue(process.env.MICROSOFT_GRAPH_TIME_ZONE) ||
+    "Central Standard Time"
+  );
+}
+
+function getRequiredMicrosoftCalendarEnv(
+  key: (typeof requiredMicrosoftCalendarEnv)[number],
+  errorMessage: string,
+) {
+  const value = normalizeEnvValue(process.env[key]);
+
+  if (!value) {
+    throw new Error(errorMessage);
+  }
+
+  return value;
 }
