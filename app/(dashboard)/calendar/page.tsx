@@ -10,6 +10,8 @@ export default async function CalendarPage() {
         id,
         name,
         date,
+        start_time,
+        end_time,
         grade_level,
         facility:facilities!events_facility_id_fkey(name),
         entity:entities!events_entity_id_fkey(name, type)
@@ -26,6 +28,8 @@ export default async function CalendarPage() {
       id: event.id,
       name: event.name,
       date: event.date,
+      startTime: event.start_time,
+      endTime: event.end_time,
       facility: facility?.name ?? "Unassigned facility",
       entity: entity?.name ?? "Unknown entity",
       entityType: entity?.type ?? "club",
@@ -44,8 +48,8 @@ export default async function CalendarPage() {
             Internal event calendar
           </h1>
           <p className="mt-3 max-w-2xl text-base leading-7 text-stone-600">
-            Approved events are previewed on a monthly grid with entity,
-            facility, and grade level filters.
+            Approved events are organized across month, week, list, and
+            facilities views for school-wide coordination.
           </p>
         </div>
       </section>
