@@ -18,6 +18,10 @@ const adminLinks = [
     label: "Facilities",
   },
   {
+    href: "/admin/approval-chains",
+    label: "Chains",
+  },
+  {
     href: "/admin/audit",
     label: "Audit",
   },
